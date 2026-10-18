@@ -5,7 +5,7 @@ export default {
   all: 'ሁሉም', search: 'መመሪያዎችን ፈልግ', scan: 'ኮድ ስካን አድርግ', scanHint: 'ካሜራውን ወደ ምርቱ ኮድ ያዙሩ',
   scanNotFound: 'ከዚህ ኮድ ጋር የሚመጣጠን መመሪያ አልተገኘም',
   featuredPromo: 'ልዩ ማስተዋወቂያ', sponsored: 'ስፖንሰር የተደረገ',
-  add: 'ጨምር', addToCart: 'ወደ ዘንቢል ጨምር', added: 'ወደ ዘንቢል ተጨምሯል',
+  select: 'ምረጥ', selected: 'ተመርጧል ✓', removed: 'ተወግዷል', add: 'ጨምር', addToCart: 'ወደ ዘንቢል ጨምር', added: 'ወደ ዘንቢል ተጨምሯል',
   summary: 'አጭር ማጠቃለያ', voiceGuide: 'የድምጽ መመሪያውን ያዳምጡ', downloadPdf: 'ሙሉ PDF አውርድ', code: 'ኮድ',
   noResults: 'ምንም መመሪያ አልተገኘም። ሌላ ስም ወይም ፊደል ይሞክሩ።',
   checkout: 'ወደ ክፍያ', yourOrder: 'ትዕዛዝዎ', cartEmpty: 'ዘንቢልዎ ባዶ ነው። ለመጀመር መመሪያ ይጨምሩ።',
@@ -32,5 +32,7 @@ export default {
   thankYou: 'ትዕዛዝዎ ደርሶናል', paidText: 'ክፍያው ተቀብለናል። እናመሰግናለን!',
   pendingText: 'ትዕዛዝዎ በመጠባበቅ ላይ ነው። ዝውውሩን ካረጋገጥን በኋላ እናሳውቅዎታለን።',
   orderNo: 'ትዕዛዝ', backToShop: 'ወደ መደብር ተመለስ',
+  adminTitle: 'የአስተዳዳሪ መግቢያ', adminPrompt: 'የአስተዳዳሪ የይለፍ ቃል ያስገቡ', adminWrong: 'የይለፍ ቃሉ ትክክል አይደለም።',
+  adminLocked: 'ብዙ ሙከራ ተደርጓል። ከ{s} ሰከንድ በኋላ ይሞክሩ።', adminNotSet: 'በመጀመሪያ የአስተዳዳሪ የይለፍ ቃል በ data/config.js ያስቀምጡ።', unlock: 'ክፈት',
   settings: 'ቅንብሮች', language: 'ቋንቋ', theme: 'ጨለማ ገጽታ', admin: 'የአስተዳዳሪ ፓነል', back: 'ተመለስ', remove: 'አስወግድ',
 };

@@ -5,7 +5,7 @@ export default {
   all: 'All', search: 'Search manuals', scan: 'Scan code', scanHint: 'Point the camera at the product code',
   scanNotFound: 'No manual matches this code',
   featuredPromo: 'Featured promo', sponsored: 'Sponsored',
-  add: 'Add', addToCart: 'Add to cart', added: 'Added to cart',
+  select: 'Select', selected: 'Selected ✓', removed: 'Removed', add: 'Add', addToCart: 'Add to cart', added: 'Added to cart',
   summary: 'Quick summary', voiceGuide: 'Listen to the voice guide', downloadPdf: 'Download full PDF', code: 'Code',
   noResults: 'No manuals found. Try another name or letter.',
   checkout: 'Checkout', yourOrder: 'Your Order', cartEmpty: 'Your cart is empty. Add a manual to get started.',
@@ -32,5 +32,7 @@ export default {
   thankYou: 'Order received', paidText: 'Payment received. Thank you!',
   pendingText: 'Your order is pending. We will confirm after verifying your transfer.',
   orderNo: 'Order', backToShop: 'Back to shop',
+  adminTitle: 'Admin access', adminPrompt: 'Enter the admin password', adminWrong: 'Wrong password.',
+  adminLocked: 'Too many attempts. Try again in {s}s.', adminNotSet: 'Set the admin password in data/config.js first.', unlock: 'Unlock',
   settings: 'Settings', language: 'Language', theme: 'Dark mode', admin: 'Admin panel', back: 'Back', remove: 'Remove',
 };

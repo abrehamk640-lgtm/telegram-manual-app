@@ -2,7 +2,7 @@ import { LOCALES } from '../locales/index.js';
 import { CATEGORIES } from '../data/categories.js';
 import { PRODUCTS } from '../data/products.js';
 import { PROMOS } from '../data/promos.js';
-import { PAYMENTS, CONFIG, ADMIN_IDS } from '../data/config.js';
+import { PAYMENTS, CONFIG, ADMIN_IDS, ADMIN_PASSWORD, ADMIN_PASSWORD_HASH } from '../data/config.js';
 
 const tg = window.Telegram?.WebApp;
 const $ = (s) => document.querySelector(s);
@@ -22,10 +22,10 @@ const state = {
   screen: CONFIG.SHOW_WELCOME ? 'welcome' : 'shop',
   cat: '', q: '', letter: '', sheet: null, view: null,
   pay: PAYMENTS[0].id, phone: saved.phone || '', name: saved.name || tgUser.first_name || '', pickup: 0,
-  orderId: '', err: '', busy: false, wait: null, done: null,
+  orderId: '', err: '', busy: false, wait: null, done: null, pw: null,
   lang: LOCALES[saved.lang] ? saved.lang : LOCALES[tgUser.language_code] ? tgUser.language_code : 'am',
   theme: saved.theme || tg?.colorScheme || 'light',
-  cart: saved.cart || {},
+  cart: Object.fromEntries(Object.keys(saved.cart || {}).map((id) => [id, 1])), // manuals: always 1 copy each
 };
 const persist = () => store.set({ lang: state.lang, theme: state.theme, cart: state.cart, phone: state.phone, name: state.name });
 const set = (patch) => {
@@ -61,9 +61,8 @@ const normPhone = (s) => {
 };
 let tt;
 function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2400); }
-function bump(id, d) {
-  const n = (state.cart[id] || 0) + d;
-  if (n > 0) state.cart[id] = n; else delete state.cart[id];
+function toggle(id) { // select / unselect a manual (quantity is always 1)
+  if (state.cart[id]) delete state.cart[id]; else state.cart[id] = 1;
   persist();
 }
 const ICONS = {
@@ -111,8 +110,7 @@ const listHTML = () => {
     return `<article class="pcard" role="button" tabindex="0" data-act="open" data-id="${p.id}">
       <div class="pimg">${media(p)}${p.voiceNoteUrl || p.manualPdfUrl ? `<span class="pbadge">${p.voiceNoteUrl ? '🎧' : ''}${p.manualPdfUrl ? '📄' : ''}</span>` : ''}</div>
       <div class="pbody"><h3>${esc(tr(p.name))}</h3><div class="price">${money(p.price)}</div>
-        ${n ? `<div class="qty"><button data-act="decl" data-id="${p.id}" aria-label="−">−</button><b>${n}</b><button data-act="add" data-id="${p.id}" aria-label="+">+</button></div>`
-          : `<button class="pbtn" data-act="add" data-id="${p.id}">${t('add')}</button>`}
+        <button class="pbtn${n ? ' on' : ''}" data-act="sel" data-id="${p.id}" aria-pressed="${!!n}">${n ? t('selected') : t('select')}</button>
       </div></article>`;
   }).join('');
 };
@@ -133,8 +131,7 @@ const order = () => {
   return pagehead(t('yourOrder')) + (it.length ? `
     <div class="box">${it.map(({ p, q }) => `<div class="oline"><div class="oth">${media(p)}</div>
       <div class="oi"><b>${esc(tr(p.name))}</b><span>${money(p.price)}</span></div>
-      <div class="ostep"><div class="stepper"><button data-act="dec" data-id="${p.id}" aria-label="−">−</button><b>${q}</b><button data-act="inc" data-id="${p.id}" aria-label="+">+</button></div>
-      <button class="trash" data-act="rm" data-id="${p.id}" aria-label="${t('remove')}">🗑</button></div></div>`).join('')}</div>
+      <button class="trash" data-act="rm" data-id="${p.id}" aria-label="${t('remove')}">🗑</button></div>`).join('')}</div>
     <div class="box rows"><div><span>${t('subtotal', { n: count() })}</span><span>${money(subtotal())}</span></div>
       <div class="mut"><span>${t('shipping')}</span><span>${t('shippingNext')}</span></div><hr>
       <div class="big"><span>${t('total')}</span><span>${money(subtotal())}</span></div></div>` : `<p class="empty">${t('cartEmpty')}</p>`);
@@ -147,7 +144,7 @@ const summary = () => {
       ? locs.map((l, i) => `<label class="loc${i === state.pickup ? ' on' : ''}"><input type="radio" name="pickup" value="${i}"${i === state.pickup ? ' checked' : ''}><span><b>${esc(tr(l.name))}</b><br><small>${esc(tr(l.address))}</small></span></label>`).join('')
       : `<h3 style="margin:4px 0">${esc(tr(loc.name))}</h3><small>${esc(tr(loc.address))}</small>`}<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">` : ''}
     <h2>${t('itemsOrdered')}</h2>
-    ${cartItems().map(({ p, q }) => `<div class="li"><span><b>${q}×</b> ${esc(tr(p.name))}</span><b>${money(p.price * q)}</b></div>`).join('')}
+    ${cartItems().map(({ p, q }) => `<div class="li"><span>${esc(tr(p.name))}</span><b>${money(p.price * q)}</b></div>`).join('')}
     <div class="rows"><hr><div class="mut"><span>${t('subtotal', { n: count() })}</span><span>${money(subtotal())}</span></div>
       ${deliveryFee() ? `<div class="mut"><span>${t('deliveryFee')}</span><span>${money(deliveryFee())}</span></div>` : ''}<hr>
       <div class="big"><span>${t('finalTotal')}</span><span>${money(grand())}</span></div></div></div>
@@ -196,12 +193,17 @@ const sheetManual = () => {
     <h3>${t('summary')}</h3><p class="vtext">${esc(tr(p.summary))}</p>
     ${p.voiceNoteUrl ? `<h3>${t('voiceGuide')}</h3><audio controls preload="none" src="${esc(p.voiceNoteUrl)}"></audio>` : ''}
     ${p.manualPdfUrl ? `<button class="btn ghost big" data-act="pdf" data-id="${p.id}">📄 ${t('downloadPdf')}</button>` : ''}
-    <div class="buy" style="margin-top:14px"><b>${money(p.price)}</b><button class="btn" data-act="addv" data-id="${p.id}">${t('addToCart')}${state.cart[p.id] ? ` (${state.cart[p.id]})` : ''}</button></div></div>`;
+    <div class="buy" style="margin-top:14px"><b>${money(p.price)}</b><button class="btn${state.cart[p.id] ? ' on' : ''}" data-act="selv" data-id="${p.id}">${state.cart[p.id] ? t('selected') : t('select')}</button></div></div>`;
 };
 const sheetSettings = () => `<div class="sheet">${head(t('settings'))}
   <h3>${t('language')}</h3><div class="langs">${Object.entries(LOCALES).map(([k, v]) => `<button class="${k === state.lang ? 'on' : ''}" data-act="setlang" data-k="${k}">${v.label}</button>`).join('')}</div>
   <div class="setrow"><span>${t('theme')}</span><button class="switch" data-act="theme" role="switch" aria-checked="${state.theme === 'dark'}" aria-label="${t('theme')}"><span>☀️</span><span>🌙</span><i></i></button></div>
   ${isAdmin() ? `<button class="btn ghost big" data-act="admin">⚙️ ${t('admin')}</button>` : ''}</div>`;
+const pwBox = () => `<div class="scrim" data-act="pwcancel"></div><div class="waitbox"><div class="waitc">
+  <h2>🔒 ${t('adminTitle')}</h2><p>${t('adminPrompt')}</p>
+  <input id="pw" class="fld" type="password" autocomplete="off" autocapitalize="off" aria-label="${t('adminPrompt')}">
+  ${state.pw.err ? `<p class="err" role="alert">${esc(state.pw.err)}</p>` : ''}
+  <button class="btn big" data-act="pwsubmit">${t('unlock')}</button><button class="btn ghost big" data-act="pwcancel">${t('cancel')}</button></div></div>`;
 const waitBox = () => `<div class="scrim"></div><div class="waitbox"><div class="waitc"><div class="spin"></div><h2>${t('waitTitle')}</h2>
   <p>${t('waitText', { amt: money(state.wait.amt) })}</p><button class="btn ghost big" data-act="cancelwait">${t('cancel')}</button></div></div>`;
 
@@ -217,7 +219,7 @@ function syncTelegram() {
   if (!tg) return;
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch {}
-  (state.sheet || state.wait || BACK[state.screen]) ? tg.BackButton.show() : tg.BackButton.hide();
+  (state.sheet || state.wait || state.pw || BACK[state.screen]) ? tg.BackButton.show() : tg.BackButton.hide();
 }
 function render() {
   document.documentElement.dataset.theme = state.theme;
@@ -225,8 +227,9 @@ function render() {
   const pages = { shop, order, summary, pay, done };
   const body = state.screen === 'welcome' ? welcome() : `${topbar()}<main>${pages[state.screen]()}</main><div id="bar" class="bar"></div>`;
   const sheet = { manual: sheetManual, settings: sheetSettings }[state.sheet];
-  $('#app').innerHTML = body + (sheet ? `<div class="scrim" data-act="close"></div>${sheet()}` : '') + (state.wait ? waitBox() : '');
+  $('#app').innerHTML = body + (sheet ? `<div class="scrim" data-act="close"></div>${sheet()}` : '') + (state.wait ? waitBox() : '') + (state.pw ? pwBox() : '');
   updateCart(); syncTelegram();
+  if (state.pw) $('#pw')?.focus();
 }
 
 /* ---------- Payments (talks to your n8n webhook) ---------- */
@@ -307,6 +310,7 @@ async function payNow() {
 /* ---------- Actions ---------- */
 const newOrderId = () => 'MH-' + Date.now().toString(36).toUpperCase();
 const back = () => {
+  if (state.pw) return set({ pw: null });
   if (state.wait) return actions.cancelwait();
   if (state.sheet) return set({ sheet: null });
   if (BACK[state.screen]) set({ screen: BACK[state.screen], err: '' });
@@ -328,11 +332,44 @@ async function copy(v) {
   toast(ok ? t('copied') : v);
 }
 let taps = 0, tapT;
+/* ---- Admin password gate (the admin code itself is only loaded after the password is accepted) ---- */
+const LOCK_KEY = 'mh_lock';
+let adminOK = false;
+const lockInfo = () => { try { return JSON.parse(localStorage.getItem(LOCK_KEY)) || { fails: 0, until: 0 }; } catch { return { fails: 0, until: 0 }; } };
+const setLock = (v) => { try { localStorage.setItem(LOCK_KEY, JSON.stringify(v)); } catch {} };
+const same = (a, b) => { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const unhex = (h) => new Uint8Array(h.match(/../g).map((x) => parseInt(x, 16)));
+async function checkPassword(pw) {
+  if (ADMIN_PASSWORD_HASH) { // format: pbkdf2$iterations$saltHex$hashHex  (made with tools/make-admin-password.html)
+    const [alg, iter, salt, hash] = ADMIN_PASSWORD_HASH.split('$');
+    if (alg !== 'pbkdf2' || !crypto?.subtle) return false;
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unhex(salt), iterations: +iter }, key, 256);
+    return same(hex(bits), hash);
+  }
+  return !!ADMIN_PASSWORD && same(pw, ADMIN_PASSWORD);
+}
+const loadAdmin = () => import('./admin.js').then((m) => m.openAdmin()).catch(() => toast('Admin panel failed to load'));
 function openAdmin() {
   if (!canAdmin()) return;
-  import('./admin.js').then((m) => m.openAdmin()).catch(() => toast('Admin panel failed to load'));
+  if (!ADMIN_PASSWORD && !ADMIN_PASSWORD_HASH) return toast(t('adminNotSet'));
+  if (adminOK) return loadAdmin();
+  set({ pw: { err: '' }, sheet: null });
 }
 const refreshList = () => { const l = $('#list'); if (l) l.innerHTML = listHTML(); updateCart(); };
+
+let pwBusy = false;
+async function tryPassword() {
+  const v = $('#pw')?.value || '', lk = lockInfo(), left = Math.ceil((lk.until - Date.now()) / 1000);
+  if (left > 0) return set({ pw: { err: t('adminLocked', { s: left }) } });
+  let ok = false; try { ok = await checkPassword(v); } catch { ok = false; }
+  if (ok) { setLock({ fails: 0, until: 0 }); adminOK = true; set({ pw: null }); return loadAdmin(); }
+  await sleep(700); // slow down guessing
+  const fails = (lk.fails || 0) + 1, lock = fails >= 5;
+  setLock({ fails: lock ? 0 : fails, until: lock ? Date.now() + 60000 : 0 });
+  set({ pw: { err: lock ? t('adminLocked', { s: 60 }) : t('adminWrong') } });
+}
 
 const actions = {
   logo: () => { taps++; clearTimeout(tapT); tapT = setTimeout(() => (taps = 0), 1500); if (taps >= 5) { taps = 0; openAdmin(); } },
@@ -348,9 +385,8 @@ const actions = {
   promo: (d) => { const x = PROMOS.find((y) => y.id === d.id); if (x?.product && prod(x.product)) set({ sheet: 'manual', view: x.product }); else if (x?.link) openLink(x.link); },
   scan,
   open: (d) => set({ sheet: 'manual', view: d.id }),
-  add: (d) => { bump(d.id, 1); hap(); refreshList(); },
-  decl: (d) => { bump(d.id, -1); refreshList(); },
-  addv: (d) => { bump(d.id, 1); hap(); toast(t('added')); render(); },
+  sel: (d) => { toggle(d.id); hap(); refreshList(); },
+  selv: (d) => { toggle(d.id); hap(); toast(state.cart[d.id] ? t('added') : t('removed')); render(); },
   pdf: (d) => {
     const p = prod(d.id);
     if (tg?.downloadFile && tg.isVersionAtLeast?.('8.0')) tg.downloadFile({ url: p.manualPdfUrl, file_name: `${p.code}.pdf` });
@@ -358,8 +394,12 @@ const actions = {
   },
   cart: () => (count() ? set({ screen: 'order', sheet: null }) : toast(t('cartEmpty'))),
   toOrder: () => set({ screen: 'order' }),
-  inc: (d) => { bump(d.id, 1); render(); },
-  dec: (d) => { bump(d.id, -1); render(); },
+  pwcancel: () => set({ pw: null }),
+  pwsubmit: async () => {
+    if (pwBusy) return;
+    pwBusy = true;
+    try { await tryPassword(); } finally { pwBusy = false; }
+  },
   rm: (d) => { delete state.cart[d.id]; persist(); render(); },
   toSummary: () => set({ screen: 'summary', orderId: state.orderId || newOrderId() }),
   toPay: () => set({ screen: 'pay', err: '', orderId: state.orderId || newOrderId() }),
@@ -374,7 +414,11 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-act]');
   if (el) actions[el.dataset.act]?.(el.dataset);
 });
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches?.('article[data-act]')) ev.target.click(); });
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter') return;
+  if (ev.target.matches?.('article[data-act]')) ev.target.click();
+  if (ev.target.id === 'pw') actions.pwsubmit();
+});
 document.addEventListener('change', (ev) => {
   if (ev.target.name === 'pickup') set({ pickup: Number(ev.target.value) });
 });

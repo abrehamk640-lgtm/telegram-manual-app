@@ -21,8 +21,16 @@ export const CONFIG = {
 };
 
 // ============ ADMIN ACCESS ============
-// Telegram user ids allowed to open the Admin panel (tap the header logo 5 times).
-// Get your id from @userinfobot. Example: [123456789]. Leave [] while testing.
+// Opening the Admin panel (tap the header logo 5 times, or the gear in Settings) asks for a password.
+// If no password is set below, the Admin panel stays locked.
+//
+// OPTION A (simple): put a password here. Note: anyone who opens your GitHub repo or website files can read it.
+export const ADMIN_PASSWORD = '';
+// OPTION B (recommended): keep only a scrambled version here. Open tools/make-admin-password.html in your
+// browser, type your password, and paste the line it gives you. If this is set, ADMIN_PASSWORD is ignored.
+export const ADMIN_PASSWORD_HASH = '';
+// Optional extra rule: Telegram user ids allowed to even try (also shows the gear button). [] = anyone with the password.
+// Get your id from @userinfobot. Example: [123456789]
 export const ADMIN_IDS = [];
 
 // ============ PAYMENT METHODS (gateway cards on the Payment page) ============
