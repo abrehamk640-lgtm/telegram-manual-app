@@ -1,14 +1,7 @@
-# Manual Hub – Telegram Mini App (frontend)
-
-Static app: no install, no build. Put this `docs/` folder in your repo.
-
-## Run / publish
-1. Test locally: in this folder run `python3 -m http.server 8000`, open http://localhost:8000
-2. Publish free: GitHub repo → Settings → Pages → Deploy from branch → `main` / `/docs`.
-3. In @BotFather: `/newapp` (or Bot Settings → Menu Button) and paste your `https://<user>.github.io/<repo>/` link.
-
-## Where to edit
-- `data/categories.js` – add categories (one block each)
-- `data/products.js` – add manuals (one line each; `code` = QR/barcode value)
-- `data/config.js` – payment account numbers, `ORDER_ENDPOINT`
-- `locales/` – texts; see the comment in `locales/index.js` to add Afaan Oromoo / Tigrigna
+# Manual Hub – update guide
+Replace/add these files in the ROOT of your repo (same paths):
+index.html, css/styles.css, js/app.js, data/products.js, data/config.js, data/promos.js (new),
+locales/en.js, locales/am.js, img/ (new; put hero-banner.jpg here).
+Unchanged: data/categories.js, locales/index.js.
+Delete the duplicate folder docs/docs/ (old copy).
+Edit: data/config.js (WEBHOOK_URL, accounts) | data/products.js (add manuals) | data/promos.js (ads/banners).
