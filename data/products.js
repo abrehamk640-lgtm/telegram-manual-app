@@ -1,5 +1,6 @@
 // =====================================================================
-//  MANUALS CATALOG  -  add a new manual by copying the TEMPLATE at the bottom
+//  MANUALS CATALOG  -  add manuals with the Admin panel (tap the header logo 5 times)
+//  or by copying the TEMPLATE at the bottom
 // =====================================================================
 //  id            unique, no spaces (e.g. 'e4')
 //  cat           must match an id in data/categories.js

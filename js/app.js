@@ -2,11 +2,13 @@ import { LOCALES } from '../locales/index.js';
 import { CATEGORIES } from '../data/categories.js';
 import { PRODUCTS } from '../data/products.js';
 import { PROMOS } from '../data/promos.js';
-import { PAYMENTS, CONFIG } from '../data/config.js';
+import { PAYMENTS, CONFIG, ADMIN_IDS } from '../data/config.js';
 
 const tg = window.Telegram?.WebApp;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const canAdmin = () => !ADMIN_IDS.length || ADMIN_IDS.includes(tgUser.id);
+const isAdmin = () => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(tgUser.id);
 const store = {
   get() { try { return JSON.parse(localStorage.getItem('mh') || '{}'); } catch { return {}; } },
   set(v) { try { localStorage.setItem('mh', JSON.stringify(v)); } catch {} },
@@ -33,6 +35,8 @@ const t = (k, v = {}) => {
 };
 const tr = (o = {}) => o[state.lang] || o.en || '';
 const money = (n) => `${n.toLocaleString('en-US')} ${t('currency')}`;
+const iconHTML = (c) => c.svg || esc(c.icon);
+const activePromos = () => PROMOS.filter((x) => x.active !== false && (!x.until || new Date(x.until + 'T23:59:59') >= new Date()));
 const prod = (id) => PRODUCTS.find((p) => p.id === id);
 const catOf = (p) => CATEGORIES.find((c) => c.id === p.cat);
 const cartItems = () => Object.entries(state.cart).map(([id, q]) => ({ p: prod(id), q })).filter((x) => x.p);
@@ -53,16 +57,18 @@ function bump(id, d) {
 const tools = (cart) => `
   <select class="ib" data-act="lang" aria-label="${t('language')}">${Object.entries(LOCALES).map(([k, v]) => `<option value="${k}"${k === state.lang ? ' selected' : ''}>${v.short}</option>`).join('')}</select>
   <button class="switch" data-act="theme" role="switch" aria-checked="${state.theme === 'dark'}" aria-label="${t('theme')}"><span>☀️</span><span>🌙</span><i></i></button>
+  ${cart && isAdmin() ? `<button class="ib" data-act="admin" aria-label="Admin">⚙️</button>` : ''}
   ${cart ? `<button class="ib" data-act="cart" aria-label="${t('cart')}">🛒<i class="badge" id="badge" hidden></i></button>` : ''}`;
 
 const welcome = () => `
   <section class="welcome">
     <div class="banner">
       <img src="img/hero-banner.jpg" alt="" onerror="this.remove()">
+      <span class="logo" data-act="logo">📖</span>
       <div class="tools">${tools(false)}</div>
     </div>
     <div class="wcard">
-      <div class="chips">${CATEGORIES.map((c) => `<span>${c.icon}</span>`).join('')}</div>
+      <div class="chips">${CATEGORIES.map((c) => `<span>${iconHTML(c)}</span>`).join('')}</div>
       <h1>${t('heroTitle')}</h1>
       <p>${t('welcomeText')}</p>
       <button class="btn big" data-act="start">${t('start')}</button>
@@ -71,28 +77,24 @@ const welcome = () => `
 
 const shell = (body) => `
   <header class="top">
-    ${state.screen === 'category' ? `<button class="ib" data-act="back" aria-label="${t('back')}">‹</button>` : ''}
+    ${state.screen === 'category' ? `<button class="ib" data-act="back" aria-label="${t('back')}">‹</button>` : '<span class="logo" data-act="logo">📖</span>'}
     <h1>${esc(state.screen === 'category' ? tr(catOf({ cat: state.cat }).name) : t('appName'))}</h1>
     ${tools(true)}
   </header>
   <main>${body}</main>`;
 
-const promoCard = (x) => {
-  const slot = !!x.slot;
-  const label = slot || x.tag === 'sponsored' ? t('sponsored') : t('featuredPromo');
-  return `<button class="promo${slot ? ' slot' : ''}${x.image ? ' img' : ''}" data-act="promo" data-id="${esc(x.id)}">
+const promoCard = (x) => `<button class="promo${x.image ? ' img' : ''}" data-act="promo" data-id="${esc(x.id)}">
     ${x.image ? `<img src="${esc(x.image)}" alt="" onerror="this.remove()">` : ''}
-    <span class="tag">${label}</span>
-    <b class="pt">${esc(slot ? t('adSlot') : tr(x.title))}</b>
-    <span class="pt pd">${esc(slot ? t('adSlotText') : tr(x.text))}</span></button>`;
-};
+    <span class="tag">${x.tag === 'sponsored' ? t('sponsored') : t('featuredPromo')}</span>
+    <b class="pt">${esc(tr(x.title))}</b>
+    <span class="pt pd">${esc(tr(x.text))}</span></button>`;
 
 const home = () => `
-  ${PROMOS.length ? `<div class="promos">${PROMOS.map(promoCard).join('')}</div>` : ''}
+  ${activePromos().length ? `<div class="promos">${activePromos().map(promoCard).join('')}</div>` : ''}
   <h2 class="sec">${t('categories')}</h2>
   <div class="grid">${CATEGORIES.map((c) => `
     <button class="card cat" data-act="cat" data-id="${c.id}">
-      <span class="ico">${c.icon}</span><b>${esc(tr(c.name))}</b>
+      <span class="ico">${iconHTML(c)}</span><b>${esc(tr(c.name))}</b>
       <small>${t('manualsCount', { n: PRODUCTS.filter((p) => p.cat === c.id).length })}</small>
     </button>`).join('')}</div>`;
 
@@ -241,7 +243,16 @@ async function place() {
   if (CONFIG.USE_SEND_DATA && tg?.initData && !payUrl) { try { tg.sendData(JSON.stringify(order)); } catch {} }
 }
 
+/* Admin lives in js/admin.js and is only downloaded when opened (regular users never load it). */
+let taps = 0, tapT;
+function openAdmin() {
+  if (!canAdmin()) return;
+  import('./admin.js').then((m) => m.openAdmin()).catch(() => toast('Admin panel failed to load'));
+}
+
 const actions = {
+  logo: () => { taps++; clearTimeout(tapT); tapT = setTimeout(() => (taps = 0), 1500); if (taps >= 5) { taps = 0; openAdmin(); } },
+  admin: openAdmin,
   start: () => set({ screen: 'home' }),
   theme: () => set({ theme: state.theme === 'dark' ? 'light' : 'dark' }),
   cat: (d) => set({ screen: 'category', cat: d.id, q: '', letter: '' }),

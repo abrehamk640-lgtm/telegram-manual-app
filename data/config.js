@@ -10,6 +10,13 @@ export const CONFIG = {
   CURRENCY: 'ETB',
 };
 
+// ============ ADMIN ACCESS ============
+// Telegram user ids allowed to open the Admin panel (tap the header logo 5 times).
+// Get your id from @userinfobot. Example: [123456789]. Admins also get a gear button in the header.
+// Leave [] while testing (then anyone who finds the secret tap can open it - it only generates text,
+// nothing goes live until YOU upload the files to GitHub).
+export const ADMIN_IDS = [];
+
 // ============ PAYMENT METHODS ============
 // `label` is the English name sent to n8n. Names shown to users live in locales (pay_<id>).
 export const PAYMENTS = [
