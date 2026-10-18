@@ -25,13 +25,13 @@ export const CONFIG = {
 // If no password is set below, the Admin panel stays locked.
 //
 // OPTION A (simple): put a password here. Note: anyone who opens your GitHub repo or website files can read it.
-export const ADMIN_PASSWORD = '';
+export const ADMIN_PASSWORD = '32394619';
 // OPTION B (recommended): keep only a scrambled version here. Open tools/make-admin-password.html in your
 // browser, type your password, and paste the line it gives you. If this is set, ADMIN_PASSWORD is ignored.
 export const ADMIN_PASSWORD_HASH = '';
 // Optional extra rule: Telegram user ids allowed to even try (also shows the gear button). [] = anyone with the password.
 // Get your id from @userinfobot. Example: [123456789]
-export const ADMIN_IDS = [];
+export const ADMIN_IDS = [928441512];
 
 // ============ PAYMENT METHODS (gateway cards on the Payment page) ============
 // mode 'direct' = Telebirr prompt to the customer's phone (needs the n8n workflow).
