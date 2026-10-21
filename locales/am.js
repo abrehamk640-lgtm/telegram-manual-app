@@ -35,4 +35,12 @@ export default {
   adminTitle: 'የአስተዳዳሪ መግቢያ', adminPrompt: 'የአስተዳዳሪ የይለፍ ቃል ያስገቡ', adminWrong: 'የይለፍ ቃሉ ትክክል አይደለም።',
   adminLocked: 'ብዙ ሙከራ ተደርጓል። ከ{s} ሰከንድ በኋላ ይሞክሩ።', adminNotSet: 'በመጀመሪያ የአስተዳዳሪ የይለፍ ቃል በ data/config.js ያስቀምጡ።', unlock: 'ክፈት',
   settings: 'ቅንብሮች', language: 'ቋንቋ', theme: 'ጨለማ ገጽታ', admin: 'የአስተዳዳሪ ፓነል', back: 'ተመለስ', remove: 'አስወግድ',
+  // --- v2: header controls, buy flow, multi-format manual viewer ---
+  buy: 'ግዛ', inCartLang: '✓ ተመርጧል · {l}', addedLang: 'ወደ ዘንቢል ተጨምሯል · {l}', langUpdated: 'ቋንቋ ተቀይሯል · {l}', removeFromCart: 'ከዘንቢል አስወግድ',
+  manualLangTitle: 'የማኑዋል ቋንቋ ይምረጡ', manualLang: 'የማኑዋል ቋንቋ',
+  tabRead: 'ሙሉ መመሪያ አንብብ', tabSummary: 'ማጠቃለያ', tabAudio: 'ድምጽ አዳምጥ', tabMedia: 'ምስሎች/PDF ተመልከት',
+  contentLang: 'ቋንቋ', fallbackNote: 'በ{l} ገና አልተዘጋጀም። በሌላ ቋንቋ ይታያል።',
+  noContent: 'ለዚህ መመሪያ ገና ይዘት አልተጨመረም።', imagesTitle: 'የምስል መመሪያ', openPdf: 'PDF ክፈት / አውርድ',
+  profile: 'መገለጫ', langSwitch: 'ቋንቋ', themeToDark: 'ወደ ጨለማ ገጽታ ቀይር', themeToLight: 'ወደ ብርሃን ገጽታ ቀይር',
+  scanUnsupported: 'የQR ስካነሩን ለመጠቀም እባክዎ ቴሌግራምን ያዘምኑ።',
 };

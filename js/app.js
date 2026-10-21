@@ -18,14 +18,19 @@ const saved = store.get();
 const tgUser = tg?.initDataUnsafe?.user || {};
 const canAdmin = () => !ADMIN_IDS.length || ADMIN_IDS.includes(tgUser.id);
 const isAdmin = () => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(tgUser.id);
+const MANUAL_LANGS = ['am', 'en'].filter((k) => LOCALES[k]); // languages a manual can be bought in
+const startLang = LOCALES[saved.lang] ? saved.lang : LOCALES[tgUser.language_code] ? tgUser.language_code : 'am';
+const dfltManualLang = MANUAL_LANGS.includes(startLang) ? startLang : MANUAL_LANGS[0];
+// cart: { [manualId]: { q: 1, lang: 'am' | 'en' } }  (older saved carts were { id: 1 } - upgraded here)
+const normCart = (c) => Object.fromEntries(Object.entries(c || {}).map(([id, v]) => [id, { q: 1, lang: MANUAL_LANGS.includes(v?.lang) ? v.lang : dfltManualLang }]));
 const state = {
   screen: CONFIG.SHOW_WELCOME ? 'welcome' : 'shop',
-  cat: '', q: '', letter: '', sheet: null, view: null,
+  cat: '', q: '', letter: '', sheet: null, view: null, vtab: 'summary', vlang: dfltManualLang, buy: null, zoom: '',
   pay: PAYMENTS[0].id, phone: saved.phone || '', name: saved.name || tgUser.first_name || '', pickup: 0,
   orderId: '', err: '', busy: false, wait: null, done: null, pw: null,
-  lang: LOCALES[saved.lang] ? saved.lang : LOCALES[tgUser.language_code] ? tgUser.language_code : 'am',
+  lang: startLang,
   theme: saved.theme || tg?.colorScheme || 'light',
-  cart: Object.fromEntries(Object.keys(saved.cart || {}).map((id) => [id, 1])), // manuals: always 1 copy each
+  cart: normCart(saved.cart),
 };
 const persist = () => store.set({ lang: state.lang, theme: state.theme, cart: state.cart, phone: state.phone, name: state.name });
 const set = (patch) => {
@@ -44,7 +49,7 @@ const tr = (o = {}) => o[state.lang] || o.en || '';
 const money = (n) => `${t('cur')}${Number(n).toLocaleString('en-US')}`;
 const prod = (id) => PRODUCTS.find((p) => p.id === id);
 const catOf = (p) => CATEGORIES.find((c) => c.id === p.cat) || { name: {} };
-const cartItems = () => Object.entries(state.cart).map(([id, q]) => ({ p: prod(id), q })).filter((x) => x.p);
+const cartItems = () => Object.entries(state.cart).map(([id, c]) => ({ p: prod(id), q: 1, lang: c.lang })).filter((x) => x.p);
 const count = () => cartItems().reduce((a, x) => a + x.q, 0);
 const subtotal = () => cartItems().reduce((a, x) => a + x.q * x.p.price, 0);
 const deliveryFee = () => (count() ? CONFIG.DELIVERY_FEE || 0 : 0);
@@ -52,6 +57,31 @@ const grand = () => subtotal() + deliveryFee();
 const method = () => PAYMENTS.find((x) => x.id === state.pay) || PAYMENTS[0];
 const media = (p) => (p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : '') + (p.image ? '' : esc(p.emoji || '📘'));
 const activePromos = () => PROMOS.filter((x) => x.active !== false && (!x.until || new Date(x.until + 'T23:59:59') >= new Date()));
+const mlName = (k) => LOCALES[k]?.label || k;
+const mlShort = (k) => LOCALES[k]?.short || k;
+const isMap = (v) => v && typeof v === 'object' && !Array.isArray(v);
+// a field can be a plain value or { en, am }: pick the reader's language, fall back to another one
+const pick = (v, l) => (isMap(v) ? v[l] || v.en || v.am || '' : v || '');
+const lacks = (v, l) => isMap(v) && !v[l] && Object.values(v).some(Boolean);
+const anyVal = (v) => (isMap(v) ? Object.values(v).some(Boolean) : Array.isArray(v) ? v.length > 0 : !!v);
+const imgsOf = (p, l) => {
+  const raw = Array.isArray(p.images) ? p.images : (isMap(p.images) && (p.images[l] || p.images.en || p.images.am)) || [];
+  return raw.map((x) => (typeof x === 'string' ? { src: x, cap: '' } : { src: x.src, cap: tr(x.caption) })).filter((x) => x.src);
+};
+// tiny formatter for fullText / summary: "# heading", "- bullet", "1. step", blank line = new paragraph
+function rich(srcText) {
+  let out = '', list = '';
+  const close = () => { if (list) { out += `</${list}>`; list = ''; } };
+  for (const raw of String(srcText || '').replace(/\r/g, '').split('\n')) {
+    const ln = raw.trim(); let m;
+    if (!ln) close();
+    else if ((m = ln.match(/^#{1,3}\s+(.*)$/))) { close(); out += `<h4>${esc(m[1])}</h4>`; }
+    else if ((m = ln.match(/^[-•*]\s+(.*)$/))) { if (list !== 'ul') { close(); out += '<ul>'; list = 'ul'; } out += `<li>${esc(m[1])}</li>`; }
+    else if ((m = ln.match(/^\d+[.)]\s+(.*)$/))) { if (list !== 'ol') { close(); out += '<ol>'; list = 'ol'; } out += `<li>${esc(m[1])}</li>`; }
+    else { close(); out += `<p>${esc(ln)}</p>`; }
+  }
+  close(); return out;
+}
 const hap = () => tg?.HapticFeedback?.impactOccurred('light');
 const openLink = (u) => (tg?.openLink ? tg.openLink(u) : window.open(u, '_blank'));
 const normPhone = (s) => {
@@ -61,19 +91,25 @@ const normPhone = (s) => {
 };
 let tt;
 function toast(m) { const el = $('#toast'); el.textContent = m; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2400); }
-function toggle(id) { // select / unselect a manual (quantity is always 1)
-  if (state.cart[id]) delete state.cart[id]; else state.cart[id] = 1;
-  persist();
-}
+const ui = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const UI = {
+  scan: ui('<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 12h10"/>'),
+  cart: ui('<path d="M6 8h12l-1 12H7L6 8zM9 8a3 3 0 0 1 6 0"/>'),
+  sun: ui('<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>'),
+  moon: ui('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+};
 const ICONS = {
   telebirr: '<svg viewBox="0 0 32 32" fill="none" stroke="#1F5FBF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="4" width="14" height="24" rx="3"/><path d="M14 24h4M5 11c-2 3-2 7 0 10M27 11c2 3 2 7 0 10"/></svg>',
   bank: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12L16 5l12 7zM7 14v9M13 14v9M19 14v9M25 14v9M4 27h24"/></svg>',
 };
 
 /* ---------- Views ---------- */
+const langSwitch = () => `<div class="seg" role="group" aria-label="${t('langSwitch')}">${Object.entries(LOCALES).map(([k, v]) => `<button class="${k === state.lang ? 'on' : ''}" data-act="setlang" data-k="${k}" aria-pressed="${k === state.lang}">${v.short}</button>`).join('')}</div>`;
+const themeBtn = () => `<button class="rnd" data-act="theme" aria-label="${state.theme === 'dark' ? t('themeToLight') : t('themeToDark')}">${state.theme === 'dark' ? UI.sun : UI.moon}</button>`;
+
 const welcome = () => `
   <section class="welcome">
-    <div class="banner"><img src="img/hero-banner.jpg" alt="" onerror="this.remove()"></div>
+    <div class="banner"><img src="img/hero-banner.jpg" alt="" onerror="this.remove()"><div class="wtools">${langSwitch()}${themeBtn()}</div></div>
     <div class="wcard">
       <div class="wchips">${CATEGORIES.map((c) => `<span>${c.svg || esc(c.icon)}</span>`).join('')}</div>
       <h1 data-act="logo">${t('heroTitle')}</h1>
@@ -87,8 +123,9 @@ const topbar = () => {
   return `<header class="app">
     <span class="brand" data-act="logo">${esc(t('appName'))}</span>
     <div class="hr">
-      <button class="rnd" data-act="scan" aria-label="${t('scan')}">📷</button>
-      <button class="cartpill" data-act="cart" aria-label="${t('yourOrder')}">🛍<span id="pilltxt"></span><i class="badge" id="badge" hidden></i></button>
+      ${langSwitch()}${themeBtn()}
+      <button class="rnd" data-act="scan" aria-label="${t('scan')}">${UI.scan}</button>
+      <button class="rnd" data-act="cart" aria-label="${t('yourOrder')}">${UI.cart}<i class="badge" id="badge" hidden></i></button>
       <button class="avatar" data-act="settings" aria-label="${t('settings')}">${tgUser.photo_url ? `<img src="${esc(tgUser.photo_url)}" alt="" onerror="this.remove()">` : ''}${esc(ini)}</button>
     </div></header>`;
 };
@@ -107,10 +144,11 @@ const listHTML = () => {
   if (!l.length) return `<p class="empty">${t('noResults')}</p>`;
   return l.map((p) => {
     const n = state.cart[p.id];
+    const badges = `${anyVal(p.fullText) ? '📖' : ''}${anyVal(p.voiceNoteUrl) ? '🎧' : ''}${anyVal(p.images) || anyVal(p.manualPdfUrl) ? '📄' : ''}`;
     return `<article class="pcard" role="button" tabindex="0" data-act="open" data-id="${p.id}">
-      <div class="pimg">${media(p)}${p.voiceNoteUrl || p.manualPdfUrl ? `<span class="pbadge">${p.voiceNoteUrl ? '🎧' : ''}${p.manualPdfUrl ? '📄' : ''}</span>` : ''}</div>
+      <div class="pimg">${media(p)}${badges ? `<span class="pbadge">${badges}</span>` : ''}</div>
       <div class="pbody"><h3>${esc(tr(p.name))}</h3><div class="price">${money(p.price)}</div>
-        <button class="pbtn${n ? ' on' : ''}" data-act="sel" data-id="${p.id}" aria-pressed="${!!n}">${n ? t('selected') : t('select')}</button>
+        <button class="pbtn${n ? ' on' : ''}" data-act="buy" data-id="${p.id}">${n ? t('inCartLang', { l: mlShort(n.lang) }) : t('buy')}</button>
       </div></article>`;
   }).join('');
 };
@@ -129,8 +167,8 @@ const shop = () => `
 const order = () => {
   const it = cartItems();
   return pagehead(t('yourOrder')) + (it.length ? `
-    <div class="box">${it.map(({ p, q }) => `<div class="oline"><div class="oth">${media(p)}</div>
-      <div class="oi"><b>${esc(tr(p.name))}</b><span>${money(p.price)}</span></div>
+    <div class="box">${it.map(({ p, q, lang }) => `<div class="oline"><div class="oth">${media(p)}</div>
+      <div class="oi"><b>${esc(tr(p.name))}</b><span>${money(p.price)}</span><div><button class="lchip" data-act="buy" data-id="${p.id}" aria-label="${t('manualLang')}">🌐 ${esc(mlName(lang))} ▾</button></div></div>
       <button class="trash" data-act="rm" data-id="${p.id}" aria-label="${t('remove')}">🗑</button></div>`).join('')}</div>
     <div class="box rows"><div><span>${t('subtotal', { n: count() })}</span><span>${money(subtotal())}</span></div>
       <div class="mut"><span>${t('shipping')}</span><span>${t('shippingNext')}</span></div><hr>
@@ -144,7 +182,7 @@ const summary = () => {
       ? locs.map((l, i) => `<label class="loc${i === state.pickup ? ' on' : ''}"><input type="radio" name="pickup" value="${i}"${i === state.pickup ? ' checked' : ''}><span><b>${esc(tr(l.name))}</b><br><small>${esc(tr(l.address))}</small></span></label>`).join('')
       : `<h3 style="margin:4px 0">${esc(tr(loc.name))}</h3><small>${esc(tr(loc.address))}</small>`}<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">` : ''}
     <h2>${t('itemsOrdered')}</h2>
-    ${cartItems().map(({ p, q }) => `<div class="li"><span>${esc(tr(p.name))}</span><b>${money(p.price * q)}</b></div>`).join('')}
+    ${cartItems().map(({ p, q, lang }) => `<div class="li"><span>${esc(tr(p.name))}<small>${t('manualLang')}: ${esc(mlName(lang))}</small></span><b>${money(p.price * q)}</b></div>`).join('')}
     <div class="rows"><hr><div class="mut"><span>${t('subtotal', { n: count() })}</span><span>${money(subtotal())}</span></div>
       ${deliveryFee() ? `<div class="mut"><span>${t('deliveryFee')}</span><span>${money(deliveryFee())}</span></div>` : ''}<hr>
       <div class="big"><span>${t('finalTotal')}</span><span>${money(grand())}</span></div></div></div>
@@ -185,19 +223,47 @@ const barHTML = () => {
 };
 
 const head = (title) => `<div class="sh-h"><h2>${title}</h2><button class="ib" data-act="close" aria-label="✕">✕</button></div>`;
+const TABS = [['read', '📖', 'tabRead'], ['summary', '📝', 'tabSummary'], ['audio', '🎧', 'tabAudio'], ['media', '🖼', 'tabMedia']];
+const hasTab = (p, L) => ({
+  read: !!pick(p.fullText, L), summary: !!pick(p.summary, L), audio: !!pick(p.voiceNoteUrl, L),
+  media: imgsOf(p, L).length > 0 || !!pick(p.manualPdfUrl, L),
+});
+const note = (v, L) => (lacks(v, L) ? `<p class="hint">${t('fallbackNote', { l: esc(mlName(L)) })}</p>` : '');
+const panel = (p, L, tab) => {
+  switch (tab) {
+    case 'read': return note(p.fullText, L) + `<div class="doc">${rich(pick(p.fullText, L))}</div>`;
+    case 'summary': return note(p.summary, L) + `<div class="doc">${rich(pick(p.summary, L))}</div>`;
+    case 'audio': return note(p.voiceNoteUrl, L) + `<h3>${t('voiceGuide')}</h3><audio controls preload="none" src="${esc(pick(p.voiceNoteUrl, L))}"></audio>`;
+    case 'media': {
+      const imgs = imgsOf(p, L), pdfUrl = pick(p.manualPdfUrl, L);
+      return note(p.images, L) + note(p.manualPdfUrl, L)
+        + (imgs.length ? `<h3>${t('imagesTitle')}</h3><div class="gal">${imgs.map((x) => `<figure><img src="${esc(x.src)}" alt="${esc(x.cap)}" loading="lazy" data-act="zoom" data-src="${esc(x.src)}" onerror="this.closest('figure').remove()">${x.cap ? `<figcaption>${esc(x.cap)}</figcaption>` : ''}</figure>`).join('')}</div>` : '')
+        + (pdfUrl ? `<button class="btn ghost big" data-act="pdf" data-id="${p.id}" data-l="${L}">📄 ${t('openPdf')}</button>` : '');
+    }
+    default: return `<p class="empty">${t('noContent')}</p>`;
+  }
+};
+const vfooter = (p) => { const c = state.cart[p.id]; return `<div class="vft"><div><b class="vprice">${money(p.price)}</b>${c ? `<small>${t('manualLang')}: ${esc(mlName(c.lang))}</small>` : ''}</div>
+    <button class="btn${c ? ' on' : ''}" data-act="buy" data-id="${p.id}">${c ? t('inCartLang', { l: mlShort(c.lang) }) : t('buy')}</button></div>`; };
 const sheetManual = () => {
   const p = prod(state.view); if (!p) return '';
-  return `<div class="sheet">${head(esc(tr(p.name)))}
-    <div class="vimg">${media(p)}</div>
-    <div class="meta"><small>${esc(tr(catOf(p).name))}</small><small>${t('code')}: ${esc(p.code)}</small></div>
-    <h3>${t('summary')}</h3><p class="vtext">${esc(tr(p.summary))}</p>
-    ${p.voiceNoteUrl ? `<h3>${t('voiceGuide')}</h3><audio controls preload="none" src="${esc(p.voiceNoteUrl)}"></audio>` : ''}
-    ${p.manualPdfUrl ? `<button class="btn ghost big" data-act="pdf" data-id="${p.id}">📄 ${t('downloadPdf')}</button>` : ''}
-    <div class="buy" style="margin-top:14px"><b>${money(p.price)}</b><button class="btn${state.cart[p.id] ? ' on' : ''}" data-act="selv" data-id="${p.id}">${state.cart[p.id] ? t('selected') : t('select')}</button></div></div>`;
+  const L = state.vlang, has = hasTab(p, L);
+  const tabs = TABS.filter(([id]) => has[id]);
+  const tab = tabs.some(([id]) => id === state.vtab) ? state.vtab : tabs[0]?.[0] || '';
+  return `<div class="sheet vs">
+    <div class="vhd"><div class="vth">${media(p)}</div>
+      <div class="vtt"><h2>${esc(tr(p.name))}</h2><small>${esc(tr(catOf(p).name))} · ${t('code')}: ${esc(p.code)}</small></div>
+      <button class="ib" data-act="close" aria-label="✕">✕</button></div>
+    ${tabs.length ? `<div class="tabs" role="tablist">${tabs.map(([id, ic, k]) => `<button class="tab${id === tab ? ' on' : ''}" role="tab" aria-selected="${id === tab}" data-act="vtab" data-k="${id}">${ic} ${t(k)}</button>`).join('')}</div>` : ''}
+    <div class="vbody">
+      ${MANUAL_LANGS.length > 1 ? `<div class="vlr"><small>${t('contentLang')}</small><div class="seg">${MANUAL_LANGS.map((k) => `<button class="${k === L ? 'on' : ''}" data-act="vlang" data-k="${k}">${mlShort(k)}</button>`).join('')}</div></div>` : ''}
+      ${panel(p, L, tab)}
+    </div>
+    ${vfooter(p)}</div>`;
 };
-const sheetSettings = () => `<div class="sheet">${head(t('settings'))}
-  <h3>${t('language')}</h3><div class="langs">${Object.entries(LOCALES).map(([k, v]) => `<button class="${k === state.lang ? 'on' : ''}" data-act="setlang" data-k="${k}">${v.label}</button>`).join('')}</div>
-  <div class="setrow"><span>${t('theme')}</span><button class="switch" data-act="theme" role="switch" aria-checked="${state.theme === 'dark'}" aria-label="${t('theme')}"><span>☀️</span><span>🌙</span><i></i></button></div>
+const sheetSettings = () => `<div class="sheet">${head(t('profile'))}
+  <div class="prof"><span class="pav">${esc(((tgUser.first_name || state.name || 'M')[0] || 'M').toUpperCase())}</span>
+    <div><b>${esc(tgUser.first_name || state.name || '—')}</b>${tgUser.username ? `<small> @${esc(tgUser.username)}</small>` : ''}</div></div>
   ${isAdmin() ? `<button class="btn ghost big" data-act="admin">⚙️ ${t('admin')}</button>` : ''}</div>`;
 const pwBox = () => `<div class="scrim" data-act="pwcancel"></div><div class="waitbox"><div class="waitc">
   <h2>🔒 ${t('adminTitle')}</h2><p>${t('adminPrompt')}</p>
@@ -206,6 +272,30 @@ const pwBox = () => `<div class="scrim" data-act="pwcancel"></div><div class="wa
   <button class="btn big" data-act="pwsubmit">${t('unlock')}</button><button class="btn ghost big" data-act="pwcancel">${t('cancel')}</button></div></div>`;
 const waitBox = () => `<div class="scrim"></div><div class="waitbox"><div class="waitc"><div class="spin"></div><h2>${t('waitTitle')}</h2>
   <p>${t('waitText', { amt: money(state.wait.amt) })}</p><button class="btn ghost big" data-act="cancelwait">${t('cancel')}</button></div></div>`;
+
+/* ---------- Overlays (own container, so the page and any playing audio are not redrawn) ---------- */
+const modalHTML = () => {
+  if (state.zoom) return `<div class="zoom" data-act="unzoom" role="dialog" aria-modal="true"><img src="${esc(state.zoom)}" alt=""></div>`;
+  const p = state.buy && prod(state.buy); if (!p) return '';
+  const cur = state.cart[p.id]?.lang;
+  return `<div class="scrim hi" data-act="closebuy"></div>
+    <div class="lmodal" role="dialog" aria-modal="true" aria-labelledby="lmt"><div class="lmc">
+      <h2 id="lmt">${esc(LOCALES.en.dict.manualLangTitle)} / ${esc(LOCALES.am.dict.manualLangTitle)}</h2>
+      <p class="lmn">${esc(tr(p.name))}</p>
+      <div class="lopts">${MANUAL_LANGS.map((k) => `<button class="lopt${cur === k ? ' on' : ''}" data-act="pickml" data-k="${k}">${esc(mlName(k))}</button>`).join('')}</div>
+      ${cur ? `<button class="lrm" data-act="rmcart">${t('removeFromCart')}</button>` : ''}
+      <button class="lx" data-act="closebuy">${t('cancel')}</button>
+    </div></div>`;
+};
+function renderModal() { const m = $('#modal'); if (m) m.innerHTML = modalHTML(); syncTelegram(); }
+function swap(sel, html) { // replace one element in place (keeps the rest of the drawer, e.g. the audio player, untouched)
+  const el = document.querySelector(sel); if (!el || !html) return;
+  const box = document.createElement('div'); box.innerHTML = html;
+  const next = box.firstElementChild; if (next.classList.contains('sheet')) next.style.animation = 'none';
+  el.replaceWith(next);
+}
+const renderDrawer = () => swap('.sheet.vs', sheetManual());
+const refreshFooter = () => { const p = prod(state.view); if (p) swap('.vft', vfooter(p)); };
 
 /* ---------- Render ---------- */
 function updateCart() {
@@ -219,7 +309,7 @@ function syncTelegram() {
   if (!tg) return;
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch {}
-  (state.sheet || state.wait || state.pw || BACK[state.screen]) ? tg.BackButton.show() : tg.BackButton.hide();
+  (state.zoom || state.buy || state.sheet || state.wait || state.pw || BACK[state.screen]) ? tg.BackButton.show() : tg.BackButton.hide();
 }
 function render() {
   document.documentElement.dataset.theme = state.theme;
@@ -253,7 +343,7 @@ function buildOrder(m, name, phone) {
   return {
     event: 'order_created', order_id: state.orderId, created_at: new Date().toISOString(),
     user: { user_id: tgUser.id ?? null, first_name: name, username: tgUser.username || null, phone: phone || state.phone.trim(), language: state.lang },
-    items: cartItems().map(({ p, q }) => ({ id: p.id, code: p.code, name: p.name.en, name_am: p.name.am, qty: q, price: p.price, subtotal: p.price * q })),
+    items: cartItems().map(({ p, q, lang }) => ({ id: p.id, code: p.code, name: p.name.en, name_am: p.name.am, manual_language: lang, manual_language_label: mlName(lang), qty: q, price: p.price, subtotal: p.price * q })),
     subtotal: subtotal(), delivery_fee: deliveryFee(), total: grand(), currency: CONFIG.CURRENCY,
     payment_method: m.label.en, payment_code: m.id,
     pickup: loc ? { id: loc.id, name: loc.name.en, address: loc.address.en } : null,
@@ -310,18 +400,27 @@ async function payNow() {
 /* ---------- Actions ---------- */
 const newOrderId = () => 'MH-' + Date.now().toString(36).toUpperCase();
 const back = () => {
+  if (state.zoom) { state.zoom = ''; return renderModal(); }
+  if (state.buy) { state.buy = null; return renderModal(); }
   if (state.pw) return set({ pw: null });
   if (state.wait) return actions.cancelwait();
   if (state.sheet) return set({ sheet: null });
   if (BACK[state.screen]) set({ screen: BACK[state.screen], err: '' });
 };
+const openManual = (id) => set({ screen: 'shop', sheet: 'manual', view: id, vtab: 'summary', vlang: state.cart[id]?.lang || dfltManualLang });
 function scan() {
+  // Telegram's native camera scanner (WebApp.showScanQrPopup, Bot API 6.4+). It reads QR codes.
   const found = (txt) => {
-    const p = PRODUCTS.find((x) => x.code === String(txt).trim());
-    p ? set({ screen: 'shop', sheet: 'manual', view: p.id }) : toast(t('scanNotFound'));
+    const s = String(txt || '').trim();
+    const p = PRODUCTS.find((x) => String(x.code) === s) || PRODUCTS.find((x) => x.code && s.includes(String(x.code)));
+    if (p) { openManual(p.id); return true; }
+    toast(t('scanNotFound')); return true; // true = close the scanner either way
   };
-  if (tg?.showScanQrPopup) tg.showScanQrPopup({ text: t('scanHint') }, (txt) => { found(txt); return true; });
-  else { const v = prompt(t('scanHint')); if (v) found(v); }
+  if (tg?.showScanQrPopup && (!tg.isVersionAtLeast || tg.isVersionAtLeast('6.4'))) {
+    try { tg.showScanQrPopup({ text: String(t('scanHint')).slice(0, 64) }, found); return; } catch {}
+  }
+  if (tg?.initData) return toast(t('scanUnsupported')); // inside Telegram but too old
+  const v = prompt(t('scanHint')); if (v) found(v);     // plain browser (testing only)
 }
 async function copy(v) {
   let ok = false;
@@ -382,15 +481,34 @@ const actions = {
   theme: () => set({ theme: state.theme === 'dark' ? 'light' : 'dark' }),
   chip: (d) => { state.cat = d.id; document.querySelectorAll('#chips .chip').forEach((b) => b.classList.toggle('on', b.dataset.id === d.id)); refreshList(); },
   letter: (d) => { state.letter = d.l; document.querySelectorAll('.alpha button').forEach((b) => b.classList.toggle('on', b.dataset.l === d.l)); refreshList(); },
-  promo: (d) => { const x = PROMOS.find((y) => y.id === d.id); if (x?.product && prod(x.product)) set({ sheet: 'manual', view: x.product }); else if (x?.link) openLink(x.link); },
+  promo: (d) => { const x = PROMOS.find((y) => y.id === d.id); if (x?.product && prod(x.product)) openManual(x.product); else if (x?.link) openLink(x.link); },
   scan,
-  open: (d) => set({ sheet: 'manual', view: d.id }),
-  sel: (d) => { toggle(d.id); hap(); refreshList(); },
-  selv: (d) => { toggle(d.id); hap(); toast(state.cart[d.id] ? t('added') : t('removed')); render(); },
+  open: (d) => openManual(d.id),
+  // Buy -> small popup asking for the manual language -> the choice is saved on the cart item
+  buy: (d) => { if (!prod(d.id)) return; state.buy = d.id; renderModal(); },
+  closebuy: () => { state.buy = null; renderModal(); },
+  pickml: (d) => {
+    const id = state.buy; if (!id || !MANUAL_LANGS.includes(d.k)) return;
+    const had = !!state.cart[id];
+    state.cart[id] = { q: 1, lang: d.k }; state.buy = null; persist(); hap();
+    toast(t(had ? 'langUpdated' : 'addedLang', { l: mlName(d.k) }));
+    renderModal(); refreshList(); refreshFooter();
+    if (state.screen !== 'shop') render(); // order / summary pages show the language tag
+  },
+  rmcart: () => {
+    const id = state.buy; if (!id) return;
+    delete state.cart[id]; state.buy = null; persist(); toast(t('removed'));
+    renderModal(); refreshList(); refreshFooter();
+    if (state.screen !== 'shop') render();
+  },
+  vtab: (d) => { state.vtab = d.k; renderDrawer(); },
+  vlang: (d) => { state.vlang = d.k; renderDrawer(); },
+  zoom: (d) => { state.zoom = d.src; renderModal(); },
+  unzoom: () => { state.zoom = ''; renderModal(); },
   pdf: (d) => {
-    const p = prod(d.id);
-    if (tg?.downloadFile && tg.isVersionAtLeast?.('8.0')) tg.downloadFile({ url: p.manualPdfUrl, file_name: `${p.code}.pdf` });
-    else openLink(p.manualPdfUrl);
+    const p = prod(d.id), url = pick(p.manualPdfUrl, d.l || state.vlang);
+    if (tg?.downloadFile && tg.isVersionAtLeast?.('8.0')) tg.downloadFile({ url, file_name: `${p.code}-${d.l || state.vlang}.pdf` });
+    else openLink(url);
   },
   cart: () => (count() ? set({ screen: 'order', sheet: null }) : toast(t('cartEmpty'))),
   toOrder: () => set({ screen: 'order' }),

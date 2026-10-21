@@ -35,4 +35,12 @@ export default {
   adminTitle: 'Admin access', adminPrompt: 'Enter the admin password', adminWrong: 'Wrong password.',
   adminLocked: 'Too many attempts. Try again in {s}s.', adminNotSet: 'Set the admin password in data/config.js first.', unlock: 'Unlock',
   settings: 'Settings', language: 'Language', theme: 'Dark mode', admin: 'Admin panel', back: 'Back', remove: 'Remove',
+  // --- v2: header controls, buy flow, multi-format manual viewer ---
+  buy: 'Buy', inCartLang: '✓ In cart · {l}', addedLang: 'Added to cart · {l}', langUpdated: 'Language updated · {l}', removeFromCart: 'Remove from cart',
+  manualLangTitle: 'Select preferred manual language', manualLang: 'Manual language',
+  tabRead: 'Read Full Manual', tabSummary: 'Summary', tabAudio: 'Listen Audio', tabMedia: 'View Images/PDF',
+  contentLang: 'Language', fallbackNote: 'Not available in {l} yet. Showing another language.',
+  noContent: 'No content has been added for this manual yet.', imagesTitle: 'Visual guide', openPdf: 'Open / download PDF',
+  profile: 'Profile', langSwitch: 'Language', themeToDark: 'Switch to dark mode', themeToLight: 'Switch to light mode',
+  scanUnsupported: 'Please update Telegram to use the QR scanner.',
 };
