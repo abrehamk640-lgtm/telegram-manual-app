@@ -23,10 +23,14 @@ const startLang = LOCALES[saved.lang] ? saved.lang : LOCALES[tgUser.language_cod
 const dfltManualLang = MANUAL_LANGS.includes(startLang) ? startLang : MANUAL_LANGS[0];
 // cart: { [manualId]: { q: 1, lang: 'am' | 'en' } }  (older saved carts were { id: 1 } - upgraded here)
 const normCart = (c) => Object.fromEntries(Object.entries(c || {}).map(([id, v]) => [id, { q: 1, lang: MANUAL_LANGS.includes(v?.lang) ? v.lang : dfltManualLang }]));
+const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
+const regName = lsGet('userName'), regPhone = lsGet('userPhone'); // saved by the registration popup
 const state = {
   screen: CONFIG.SHOW_WELCOME ? 'welcome' : 'shop',
   cat: '', q: '', letter: '', sheet: null, view: null, vtab: 'summary', vlang: dfltManualLang, buy: null, zoom: '',
-  pay: PAYMENTS[0].id, phone: saved.phone || '', name: saved.name || tgUser.first_name || '', pickup: 0,
+  pay: PAYMENTS[0].id, phone: saved.phone || regPhone || '', name: saved.name || regName || tgUser.first_name || '', pickup: 0, reg: null,
   orderId: '', err: '', busy: false, wait: null, done: null, pw: null,
   lang: startLang,
   theme: saved.theme || tg?.colorScheme || 'light',
@@ -202,7 +206,7 @@ const pay = () => {
           <div><span><small>${t('accountNo')}</small><b>${esc(m.account.number)}</b></span><button class="copy" data-act="copy" data-v="${esc(m.account.number)}">${t('copy')}</button></div>
           <div><span><small>${t('accountHolder')}</small>${esc(m.account.holder)}</span></div>
           <div><span><small>${t('orderNo')}</small><b>${esc(ref)}</b></span><button class="copy" data-act="copy" data-v="${esc(ref)}">${t('copy')}</button></div></div>` : ''}`}
-    ${tgUser.first_name ? '' : `<h3>${t('yourName')}</h3><input id="nm" class="fld" value="${esc(state.name)}" autocomplete="given-name">`}
+    <h3>${t('yourName')}</h3><input id="nm" class="fld" value="${esc(state.name)}" autocomplete="name">
   </div>${state.err ? `<p class="err" role="alert">${esc(state.err)}</p>` : ''}`;
 };
 
@@ -263,7 +267,9 @@ const sheetManual = () => {
 };
 const sheetSettings = () => `<div class="sheet">${head(t('profile'))}
   <div class="prof"><span class="pav">${esc(((tgUser.first_name || state.name || 'M')[0] || 'M').toUpperCase())}</span>
-    <div><b>${esc(tgUser.first_name || state.name || '—')}</b>${tgUser.username ? `<small> @${esc(tgUser.username)}</small>` : ''}</div></div>
+    <div><b>${esc(state.name || tgUser.first_name || '—')}</b>${tgUser.username ? `<small> @${esc(tgUser.username)}</small>` : ''}</div></div>
+  ${state.phone ? `<small>${esc(state.phone)}</small>` : ''}
+  <button class="btn ghost big" data-act="regedit">${t('editDetails')}</button>
   ${isAdmin() ? `<button class="btn ghost big" data-act="admin">⚙️ ${t('admin')}</button>` : ''}</div>`;
 const pwBox = () => `<div class="scrim" data-act="pwcancel"></div><div class="waitbox"><div class="waitc">
   <h2>🔒 ${t('adminTitle')}</h2><p>${t('adminPrompt')}</p>
@@ -274,7 +280,18 @@ const waitBox = () => `<div class="scrim"></div><div class="waitbox"><div class=
   <p>${t('waitText', { amt: money(state.wait.amt) })}</p><button class="btn ghost big" data-act="cancelwait">${t('cancel')}</button></div></div>`;
 
 /* ---------- Overlays (own container, so the page and any playing audio are not redrawn) ---------- */
+const regHTML = () => { const r = state.reg; return `<div class="scrim hi"></div>
+  <div class="lmodal regm" role="dialog" aria-modal="true" aria-labelledby="regt"><div class="lmc regc">
+    ${langSwitch()}
+    <h2 id="regt">${t('regTitle')}</h2><p class="rs">${t('regText')}</p>
+    <label for="reg-name">${t('regName')}</label><input id="reg-name" class="fld" autocomplete="name" maxlength="60" value="${esc(r.nm)}">
+    <label for="reg-phone">${t('regPhone')}</label><input id="reg-phone" class="fld" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="0911223344" value="${esc(r.ph)}">
+    <p id="reg-err" class="err" role="alert"></p>
+    <button class="btn big" data-act="regsave">${t('regSave')}</button>
+    ${r.edit ? `<button class="lx" data-act="regcancel">${t('cancel')}</button>` : `<small class="priv">${t('regPrivacy')}</small>`}
+  </div></div>`; };
 const modalHTML = () => {
+  if (state.reg) return regHTML();
   if (state.zoom) return `<div class="zoom" data-act="unzoom" role="dialog" aria-modal="true"><img src="${esc(state.zoom)}" alt=""></div>`;
   const p = state.buy && prod(state.buy); if (!p) return '';
   const cur = state.cart[p.id]?.lang;
@@ -287,7 +304,7 @@ const modalHTML = () => {
       <button class="lx" data-act="closebuy">${t('cancel')}</button>
     </div></div>`;
 };
-function renderModal() { const m = $('#modal'); if (m) m.innerHTML = modalHTML(); syncTelegram(); }
+function renderModal() { const m = $('#modal'); if (m) m.innerHTML = modalHTML(); syncTelegram(); if (state.reg) { const i = $(state.reg.nm ? '#reg-phone' : '#reg-name'); i?.focus(); } }
 function swap(sel, html) { // replace one element in place (keeps the rest of the drawer, e.g. the audio player, untouched)
   const el = document.querySelector(sel); if (!el || !html) return;
   const box = document.createElement('div'); box.innerHTML = html;
@@ -372,7 +389,7 @@ async function poll(order, txRef) {
 async function payNow() {
   if (state.busy) return;
   const m = method();
-  const name = (tgUser.first_name || state.name || '').trim();
+  const name = (state.name || tgUser.first_name || '').trim();
   if (name.length < 2) return set({ err: t('fillName') });
   let phone = '';
   if (m.mode === 'direct') {
@@ -397,9 +414,40 @@ async function payNow() {
   }
 }
 
+/* ---------- First-time registration ---------- */
+// Ethiopian mobile in local form: 09XXXXXXXX or 07XXXXXXXX ('' if not valid). Accepts +251 / 251 / 0 / bare.
+const localPhone = (s) => {
+  let d = String(s).replace(/\D/g, '');
+  if (d.startsWith('251')) d = d.slice(3); else if (d.startsWith('0')) d = d.slice(1);
+  return /^[79]\d{8}$/.test(d) ? '0' + d : '';
+};
+const REG_PENDING = 'mh_reg_pending';
+async function sendRegistration(payload) { // background; if it fails it is retried the next time the app opens
+  const url = CONFIG.USER_REGISTER_WEBHOOK;
+  if (!url) return;
+  lsSet(REG_PENDING, JSON.stringify(payload));
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, init_data: tg?.initData || '' }), keepalive: true });
+    if (r.ok) lsDel(REG_PENDING);
+  } catch {}
+}
+function regSave() {
+  const r = state.reg; if (!r) return;
+  const name = (r.nm || '').trim().replace(/\s+/g, ' '), phone = localPhone(r.ph || '');
+  const err = $('#reg-err');
+  if (name.length < 2) { if (err) err.textContent = t('regBadName'); return $('#reg-name')?.focus(); }
+  if (!phone) { if (err) err.textContent = t('regBadPhone'); return $('#reg-phone')?.focus(); }
+  const date = new Date().toISOString();
+  lsSet('userName', name); lsSet('userPhone', phone); lsSet('userRegisteredAt', date);
+  state.name = name; state.phone = phone; state.reg = null; persist();
+  renderModal(); render(); hap(); toast(t('regThanks', { n: name.split(' ')[0] }));
+  sendRegistration({ name, phone, telegram_id: tgUser.id ?? null, register_date: date });
+}
+
 /* ---------- Actions ---------- */
 const newOrderId = () => 'MH-' + Date.now().toString(36).toUpperCase();
 const back = () => {
+  if (state.reg) { if (state.reg.edit) { state.reg = null; renderModal(); } return; }
   if (state.zoom) { state.zoom = ''; return renderModal(); }
   if (state.buy) { state.buy = null; return renderModal(); }
   if (state.pw) return set({ pw: null });
@@ -477,7 +525,10 @@ const actions = {
   home: () => set({ screen: 'shop', done: null }),
   back,
   settings: () => set({ sheet: 'settings' }),
-  setlang: (d) => set({ lang: d.k }),
+  setlang: (d) => { set({ lang: d.k }); if (state.reg) renderModal(); },
+  regsave: () => regSave(),
+  regcancel: () => { state.reg = null; renderModal(); },
+  regedit: () => { state.sheet = null; state.reg = { nm: state.name, ph: state.phone, edit: true }; render(); renderModal(); },
   theme: () => set({ theme: state.theme === 'dark' ? 'light' : 'dark' }),
   chip: (d) => { state.cat = d.id; document.querySelectorAll('#chips .chip').forEach((b) => b.classList.toggle('on', b.dataset.id === d.id)); refreshList(); },
   letter: (d) => { state.letter = d.l; document.querySelectorAll('.alpha button').forEach((b) => b.classList.toggle('on', b.dataset.l === d.l)); refreshList(); },
@@ -536,6 +587,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Enter') return;
   if (ev.target.matches?.('article[data-act]')) ev.target.click();
   if (ev.target.id === 'pw') actions.pwsubmit();
+  if (ev.target.id === 'reg-name' || ev.target.id === 'reg-phone') regSave();
 });
 document.addEventListener('change', (ev) => {
   if (ev.target.name === 'pickup') set({ pickup: Number(ev.target.value) });
@@ -545,9 +597,14 @@ document.addEventListener('input', (ev) => {
   if (el.id === 'q') { state.q = el.value; refreshList(); }
   if (el.id === 'ph') { state.phone = el.value; persist(); }
   if (el.id === 'nm') { state.name = el.value; persist(); }
+  if (state.reg && el.id === 'reg-name') state.reg.nm = el.value;
+  if (state.reg && el.id === 'reg-phone') state.reg.ph = el.value;
 });
 
 tg?.ready(); tg?.expand();
+if (!regName || !regPhone) state.reg = { nm: state.name, ph: state.phone, edit: false }; // first launch: ask who they are
+else { const pend = lsGet(REG_PENDING); if (pend && CONFIG.USER_REGISTER_WEBHOOK) { try { sendRegistration(JSON.parse(pend)); } catch {} } }
 tg?.BackButton.onClick(back);
 tg?.onEvent('themeChanged', () => { if (!store.get().theme) { state.theme = tg.colorScheme; render(); } });
 render();
+if (state.reg) renderModal();

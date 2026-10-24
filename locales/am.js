@@ -43,4 +43,8 @@ export default {
   noContent: 'ለዚህ መመሪያ ገና ይዘት አልተጨመረም።', imagesTitle: 'የምስል መመሪያ', openPdf: 'PDF ክፈት / አውርድ',
   profile: 'መገለጫ', langSwitch: 'ቋንቋ', themeToDark: 'ወደ ጨለማ ገጽታ ቀይር', themeToLight: 'ወደ ብርሃን ገጽታ ቀይር',
   scanUnsupported: 'የQR ስካነሩን ለመጠቀም እባክዎ ቴሌግራምን ያዘምኑ።',
+  regTitle: 'እንኳን ደህና መጡ!', regText: 'ስምዎንና ስልክ ቁጥርዎን አንድ ጊዜ ብቻ ያስገቡ። ክፍያ ሲፈጽሙ በራስ-ሰር እንሞላለን።',
+  regName: 'ሙሉ ስም', regPhone: 'ስልክ ቁጥር', regSave: 'መዝግብ እና ቀጥል',
+  regBadName: 'እባክዎ ሙሉ ስምዎን ያስገቡ።', regBadPhone: 'ትክክለኛ ስልክ ቁጥር ያስገቡ፣ ለምሳሌ 0911223344።',
+  regPrivacy: 'ለትዕዛዝዎ ሂደት ብቻ ይጠቀማል።', regThanks: 'እናመሰግናለን፣ {n}!', editDetails: 'መረጃዬን አስተካክል',
 };

@@ -43,4 +43,8 @@ export default {
   noContent: 'No content has been added for this manual yet.', imagesTitle: 'Visual guide', openPdf: 'Open / download PDF',
   profile: 'Profile', langSwitch: 'Language', themeToDark: 'Switch to dark mode', themeToLight: 'Switch to light mode',
   scanUnsupported: 'Please update Telegram to use the QR scanner.',
+  regTitle: 'Welcome! Let us set you up', regText: 'Enter your name and phone number once. We will fill them in at checkout for you.',
+  regName: 'Full name', regPhone: 'Phone number', regSave: 'Save & Continue',
+  regBadName: 'Please enter your full name.', regBadPhone: 'Enter a valid phone number, like 0911223344.',
+  regPrivacy: 'Used only to process your orders.', regThanks: 'Thanks, {n}!', editDetails: 'Edit my details',
 };

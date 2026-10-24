@@ -6,6 +6,10 @@ export const CONFIG = {
   //   manual_order     -> bank-transfer order (reply: { "status": "received" })
   // In the n8n Webhook node > Options > "Allowed Origins (CORS)" set * (or your site URL).
   WEBHOOK_URL: '',
+  // n8n Webhook "Production URL" that receives each NEW user's registration (POST, JSON):
+  //   { name, phone, telegram_id, register_date, init_data }   Leave '' to skip sending (details are still saved on the phone).
+  // In that n8n Webhook node > Options > "Allowed Origins (CORS)" set * (or your site URL).
+  USER_REGISTER_WEBHOOK: '',
   // TESTING ONLY: pretend payments succeed when WEBHOOK_URL is empty. Keep false in real use.
   DEMO_PAYMENTS: false,
   SHOW_WELCOME: true,          // false = open straight on the products page
