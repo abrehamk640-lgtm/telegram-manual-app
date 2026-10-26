@@ -47,4 +47,6 @@ export default {
   regName: 'ሙሉ ስም', regPhone: 'ስልክ ቁጥር', regSave: 'መዝግብ እና ቀጥል',
   regBadName: 'እባክዎ ሙሉ ስምዎን ያስገቡ።', regBadPhone: 'ትክክለኛ ስልክ ቁጥር ያስገቡ፣ ለምሳሌ 0911223344።',
   regPrivacy: 'ለትዕዛዝዎ ሂደት ብቻ ይጠቀማል።', regThanks: 'እናመሰግናለን፣ {n}!', editDetails: 'መረጃዬን አስተካክል',
+  payOnline: 'አሁን ክፈል', checkoutHint: 'በደህንነቱ የተጠበቀ የቻፓ ገጽ በቴሌብር፣ በሲቢኢ እና በሌሎችም ይከፍላሉ።',
+  payTitle: 'ክፍያዎን ያጠናቅቁ', payPending: 'የቻፓ የክፍያ ገጽ ተከፍቷል። ክፍያ ከፈጸሙ በኋላ መመሪያዎ በራስ-ሰር ወደዚህ ቻት ይላካል።', openPayment: 'የክፍያ ገጹን ክፈት',
 };

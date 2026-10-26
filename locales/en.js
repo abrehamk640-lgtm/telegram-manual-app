@@ -47,4 +47,6 @@ export default {
   regName: 'Full name', regPhone: 'Phone number', regSave: 'Save & Continue',
   regBadName: 'Please enter your full name.', regBadPhone: 'Enter a valid phone number, like 0911223344.',
   regPrivacy: 'Used only to process your orders.', regThanks: 'Thanks, {n}!', editDetails: 'Edit my details',
+  payOnline: 'Pay Now', checkoutHint: 'You will pay on a secure Chapa page with Telebirr, CBE and more.',
+  payTitle: 'Complete your payment', payPending: 'We opened the Chapa payment page. After you pay, your manual is sent to this chat automatically.', openPayment: 'Open payment page',
 };

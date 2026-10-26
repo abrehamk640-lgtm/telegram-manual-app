@@ -103,6 +103,7 @@ const UI = {
   moon: ui('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
 };
 const ICONS = {
+  chapa: '<svg viewBox="0 0 32 32" fill="none" stroke="#1F5FBF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="24" height="16" rx="3"/><path d="M4 13h24M9 19h6"/></svg>',
   telebirr: '<svg viewBox="0 0 32 32" fill="none" stroke="#1F5FBF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="4" width="14" height="24" rx="3"/><path d="M14 24h4M5 11c-2 3-2 7 0 10M27 11c2 3 2 7 0 10"/></svg>',
   bank: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12L16 5l12 7zM7 14v9M13 14v9M19 14v9M25 14v9M4 27h24"/></svg>',
 };
@@ -199,7 +200,7 @@ const pay = () => {
   return pagehead(t('paymentOptions')) + `<div class="box">
     <div class="cap">${t('chooseGateway')}</div>
     <div class="gw">${PAYMENTS.map((x) => `<button class="gwc${x.id === state.pay ? ' on' : ''}" data-act="gw" data-id="${x.id}">${ICONS[x.id] || esc(x.icon || '💳')}<span>${esc(tr(x.label))}</span></button>`).join('')}</div>
-    ${m.mode === 'direct' ? `<h3>${t('yourPhone')}</h3><input id="ph" class="fld" type="tel" inputmode="tel" placeholder="09XXXXXXXX" value="${esc(state.phone)}" autocomplete="tel"><p class="hint">${t('phonePrompt')}</p>`
+    ${m.mode !== 'manual' ? `<h3>${t('yourPhone')}</h3><input id="ph" class="fld" type="tel" inputmode="tel" placeholder="09XXXXXXXX" value="${esc(state.phone)}" autocomplete="tel"><p class="hint">${t(m.mode === 'checkout' ? 'checkoutHint' : 'phonePrompt')}</p>`
       : `<h3>${t('howToPay', { m: esc(label) })}</h3>
         <ol class="steps"><li>${t('manualStep1', { amt: money(grand()) })}</li><li>${t('manualStep2', { ref: esc(ref) })}</li><li>${t('manualStep3')}</li></ol>
         ${m.account ? `<div class="acct"><div><span><small>${t('bankName')}</small>${esc(m.account.name)}</span></div>
@@ -210,8 +211,9 @@ const pay = () => {
   </div>${state.err ? `<p class="err" role="alert">${esc(state.err)}</p>` : ''}`;
 };
 
-const done = () => { const d = state.done || {}; return `<div class="doneb"><div class="check">✓</div><h1>${t('thankYou')}</h1>
-  <p>${d.paid ? t('paidText') : t('pendingText')}</p>
+const done = () => { const d = state.done || {}; return `<div class="doneb"><div class="check">✓</div><h1>${d.url ? t('payTitle') : t('thankYou')}</h1>
+  <p>${d.url ? t('payPending') : d.paid ? t('paidText') : t('pendingText')}</p>
+  ${d.url ? `<button class="btn big" data-act="openpay">${t('openPayment')}</button>` : ''}
   <div class="box rows"><div><span>${t('orderNo')}</span><b>${esc(d.ref)}</b></div><div><span>${t('total')}</span><b>${money(d.total || 0)}</b></div></div></div>`; };
 
 const barHTML = () => {
@@ -220,7 +222,7 @@ const barHTML = () => {
     case 'shop': return count() ? `<button class="cta" data-act="toOrder">${t('checkout')} · ${money(subtotal())}</button>` : '';
     case 'order': return count() ? `<button class="cta" data-act="toSummary">${t('continue')} · ${money(grand())}</button>` : '';
     case 'summary': return `<button class="cta" data-act="toPay">${t('toPayment')}</button>`;
-    case 'pay': return `<button class="cta" data-act="pay"${state.busy ? ' disabled' : ''}>${state.busy ? t('processing') : m.mode === 'direct' ? t('payWith', { m: tr(m.label) }) : t('placeOrder')}</button>`;
+    case 'pay': return `<button class="cta" data-act="pay"${state.busy ? ' disabled' : ''}>${state.busy ? t('processing') : m.mode === 'direct' ? t('payWith', { m: tr(m.label) }) : m.mode === 'checkout' ? t('payOnline') : t('placeOrder')}</button>`;
     case 'done': return `<button class="cta" data-act="home">${t('backToShop')}</button>`;
     default: return '';
   }
@@ -350,7 +352,11 @@ async function api(payload) {
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 30000);
   try {
     const r = await fetch(CONFIG.WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, init_data: tg?.initData || '' }), signal: ctl.signal });
-    if (!r.ok) throw new Error(r.status);
+    if (!r.ok) { // the backend answered with an error (e.g. 502 when Chapa refuses): show its message, not "no connection"
+      const j = await r.json().catch(() => null);
+      if (j && typeof j === 'object') return { ...j, success: false, status: 'failed' };
+      throw new Error(r.status);
+    }
     return await r.json().catch(() => ({}));
   } catch { return undefined; } finally { clearTimeout(to); }
 }
@@ -367,9 +373,9 @@ function buildOrder(m, name, phone) {
   };
 }
 
-function finish(paid, order) {
+function finish(paid, order, url) {
   state.cart = {};
-  set({ done: { paid, ref: order.order_id, total: order.total }, wait: null, busy: false, screen: 'done', orderId: '', err: '' });
+  set({ done: { paid, ref: order.order_id, total: order.total, url: url || '' }, wait: null, busy: false, screen: 'done', orderId: '', err: '' });
 }
 
 let pollId = 0;
@@ -392,12 +398,20 @@ async function payNow() {
   const name = (state.name || tgUser.first_name || '').trim();
   if (name.length < 2) return set({ err: t('fillName') });
   let phone = '';
-  if (m.mode === 'direct') {
+  if (m.mode !== 'manual') {
     phone = normPhone(state.phone);
     if (!phone) return set({ err: t('badPhone') });
   }
   set({ busy: true, err: '' });
   const order = buildOrder(m, name, phone);
+  if (m.mode === 'checkout') { // Chapa hosted page (Telebirr, CBE and more): the backend returns checkout_url
+    const r = await api({ action: 'create_order', ...order, payer_phone: phone });
+    if (r == null) return set({ busy: false, err: r === null ? t('payNotReady') : t('netError') });
+    const url = String(r.checkout_url || '');
+    if (r.success === false || r.status === 'failed' || !/^https:\/\//.test(url)) return set({ busy: false, err: r.message || t('payFailed') });
+    finish(false, order, url);
+    return openLink(url);
+  }
   if (m.mode === 'direct') {
     const r = await api({ action: 'telebirr_charge', ...order, payer_phone: phone });
     if (r == null) return set({ busy: false, err: r === null ? t('payNotReady') : t('netError') });
@@ -575,6 +589,7 @@ const actions = {
   gw: (d) => set({ pay: d.id, err: '' }),
   pay: payNow,
   copy: (d) => copy(d.v),
+  openpay: () => { const u = state.done && state.done.url; if (u) openLink(u); },
   cancelwait: () => { pollId++; set({ wait: null }); },
   close: () => set({ sheet: null }),
 };
