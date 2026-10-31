@@ -194,7 +194,37 @@ const summary = () => {
     ${locs.length ? `<div class="note">${t('deliveryNote')}</div>` : ''}`;
 };
 
+
+/* ---------- Manual payment: details, method, receipt upload ---------- */
+const receipt = { file: null, url: '' };   // the chosen screenshot lives in memory only
+const payReceipt = () => {
+  const m = method(), a = m.account || {}, ref = state.orderId;
+  const copyRow = (label, value, bold) => `<div><span><small>${label}</small>${bold ? `<b>${esc(value)}</b>` : esc(value)}</span>${bold ? `<button class="copy" data-act="copy" data-v="${esc(value)}">${t('copy')}</button>` : ''}</div>`;
+  return pagehead(t('paymentOptions')) + `
+  <div class="box"><div class="cap"><span class="stepn">1</span>${t('step1')}</div>
+    <input id="nm" class="fld" value="${esc(state.name)}" placeholder="${t('fullName')}" autocomplete="name" maxlength="80">
+    <input id="ph" class="fld" type="tel" inputmode="tel" value="${esc(state.phone)}" placeholder="0911223344" autocomplete="tel" maxlength="16" style="margin-top:8px"></div>
+  <div class="box"><div class="cap"><span class="stepn">2</span>${t('step2')}</div>
+    <div class="gw">${PAYMENTS.map((x) => `<button class="gwc${x.id === state.pay ? ' on' : ''}" data-act="gw" data-id="${x.id}">${ICONS[x.id] || esc(x.icon || '💳')}<span>${esc(tr(x.label))}</span></button>`).join('')}</div>
+    <div class="acct">
+      ${copyRow(t('amountToPay'), money(grand()), true).replace(/<button class="copy"[^>]*>[^<]*<\/button>/, '')}
+      ${a.name ? copyRow(t('bankName'), a.name, false) : ''}
+      ${copyRow(m.id === 'bank' ? t('accountNo') : t('sendTo'), a.number || '', true)}
+      ${a.holder ? copyRow(t('accountHolder'), a.holder, false) : ''}
+      ${copyRow(t('orderNo'), ref, true)}
+    </div>
+    ${m.deepLink ? `<a class="btn big" href="${esc(m.deepLink)}">${t('openTelebirr')}</a>` : ''}
+    <p class="hint">${t('manualStep2', { ref: esc(ref) })}</p></div>
+  <div class="box"><div class="cap"><span class="stepn">3</span>${t('step3')}</div>
+    <input id="shot" type="file" accept="image/*" hidden>
+    ${receipt.file ? `<img class="shotp" src="${esc(receipt.url)}" alt=""><button class="btn ghost big" data-act="pickshot">${t('changeFile')}</button>`
+      : `<button class="drop" data-act="pickshot">📎 ${t('chooseFile')}</button>`}
+    <p class="hint">${t('receiptHint')}</p></div>
+  ${state.err ? `<p class="err" role="alert">${esc(state.err)}</p>` : ''}`;
+};
+
 const pay = () => {
+  if (method().mode === 'receipt') return payReceipt();
   const m = method(), label = tr(m.label);
   const ref = state.orderId;
   return pagehead(t('paymentOptions')) + `<div class="box">
@@ -211,8 +241,8 @@ const pay = () => {
   </div>${state.err ? `<p class="err" role="alert">${esc(state.err)}</p>` : ''}`;
 };
 
-const done = () => { const d = state.done || {}; return `<div class="doneb"><div class="check">✓</div><h1>${d.url ? t('payTitle') : t('thankYou')}</h1>
-  <p>${d.url ? t('payPending') : d.paid ? t('paidText') : t('pendingText')}</p>
+const done = () => { const d = state.done || {}; return `<div class="doneb"><div class="check">✓</div><h1>${d.receipt ? t('receiptSent') : d.url ? t('payTitle') : t('thankYou')}</h1>
+  <p>${d.receipt ? t('receiptSentText') : d.url ? t('payPending') : d.paid ? t('paidText') : t('pendingText')}</p>
   ${d.url ? `<button class="btn big" data-act="openpay">${t('openPayment')}</button>` : ''}
   <div class="box rows"><div><span>${t('orderNo')}</span><b>${esc(d.ref)}</b></div><div><span>${t('total')}</span><b>${money(d.total || 0)}</b></div></div></div>`; };
 
@@ -222,7 +252,7 @@ const barHTML = () => {
     case 'shop': return count() ? `<button class="cta" data-act="toOrder">${t('checkout')} · ${money(subtotal())}</button>` : '';
     case 'order': return count() ? `<button class="cta" data-act="toSummary">${t('continue')} · ${money(grand())}</button>` : '';
     case 'summary': return `<button class="cta" data-act="toPay">${t('toPayment')}</button>`;
-    case 'pay': return `<button class="cta" data-act="pay"${state.busy ? ' disabled' : ''}>${state.busy ? t('processing') : m.mode === 'direct' ? t('payWith', { m: tr(m.label) }) : m.mode === 'checkout' ? t('payOnline') : t('placeOrder')}</button>`;
+    case 'pay': return `<button class="cta" data-act="pay"${state.busy ? ' disabled' : ''}>${state.busy ? (m.mode === 'receipt' ? t('uploading') : t('processing')) : m.mode === 'receipt' ? t('submitPayment') : m.mode === 'direct' ? t('payWith', { m: tr(m.label) }) : m.mode === 'checkout' ? t('payOnline') : t('placeOrder')}</button>`;
     case 'done': return `<button class="cta" data-act="home">${t('backToShop')}</button>`;
     default: return '';
   }
@@ -373,9 +403,9 @@ function buildOrder(m, name, phone) {
   };
 }
 
-function finish(paid, order, url) {
+function finish(paid, order, url, receiptSent) {
   state.cart = {};
-  set({ done: { paid, ref: order.order_id, total: order.total, url: url || '' }, wait: null, busy: false, screen: 'done', orderId: '', err: '' });
+  set({ done: { paid, ref: order.order_id, total: order.total, url: url || '', receipt: !!receiptSent }, wait: null, busy: false, screen: 'done', orderId: '', err: '' });
 }
 
 let pollId = 0;
@@ -395,6 +425,7 @@ async function poll(order, txRef) {
 async function payNow() {
   if (state.busy) return;
   const m = method();
+  if (m.mode === 'receipt') return submitReceipt(m);
   const name = (state.name || tgUser.first_name || '').trim();
   if (name.length < 2) return set({ err: t('fillName') });
   let phone = '';
@@ -426,6 +457,61 @@ async function payNow() {
     finish(false, order);
     if (CONFIG.USE_SEND_DATA && tg?.initData) { try { tg.sendData(JSON.stringify(order)); } catch {} }
   }
+}
+
+
+/* ---------- Receipt upload (multipart POST to n8n) ---------- */
+async function compressImage(file, maxSide = 1600, quality = 0.85) { // smaller upload, faster on mobile data; falls back to the original
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', quality));
+    return blob && blob.size < file.size ? blob : file;
+  } catch { return file; }
+}
+async function handleFile(f) {
+  if (!f) return;
+  const max = (CONFIG.MAX_UPLOAD_MB || 8) * 1024 * 1024;
+  if (!/^image\//.test(f.type) || f.size > 30 * 1024 * 1024) return set({ err: t('badFile', { mb: CONFIG.MAX_UPLOAD_MB || 8 }) });
+  const blob = await compressImage(f);
+  if (blob.size > max) return set({ err: t('badFile', { mb: CONFIG.MAX_UPLOAD_MB || 8 }) });
+  if (receipt.url) URL.revokeObjectURL(receipt.url);
+  receipt.file = blob; receipt.url = URL.createObjectURL(blob);
+  set({ err: '' });
+}
+async function submitReceipt(m) {
+  const name = (state.name || tgUser.first_name || '').trim().replace(/\s+/g, ' ');
+  const phone = localPhone(state.phone);
+  if (name.length < 2) return set({ err: t('fillName') });
+  if (!phone) return set({ err: t('regBadPhone') });
+  if (!receipt.file) return set({ err: t('needReceipt') });
+  if (!CONFIG.RECEIPT_WEBHOOK) return set({ err: t('payNotReady') });
+  set({ busy: true, err: '', name, phone });
+  const order = buildOrder(m, name, phone);
+  const fd = new FormData();   // no Content-Type header: the browser adds the multipart boundary itself
+  fd.append('order_id', order.order_id);
+  fd.append('customer_name', name);
+  fd.append('customer_phone', phone);
+  fd.append('payment_method', m.id);               // telebirr | bank
+  fd.append('total', String(order.total));
+  fd.append('currency', order.currency);
+  fd.append('items', JSON.stringify(order.items));
+  fd.append('telegram_id', String(tgUser.id ?? ''));
+  fd.append('init_data', tg?.initData || '');      // lets n8n check that the request really comes from Telegram
+  fd.append('lang', state.lang);
+  fd.append('screenshot', receipt.file, receipt.file.type === 'image/png' ? 'receipt.png' : 'receipt.jpg');
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 60000);
+  try {
+    const r = await fetch(CONFIG.RECEIPT_WEBHOOK, { method: 'POST', body: fd, signal: ctl.signal });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || j.success === false) return set({ busy: false, err: (j && j.message) || t('payFailed') });
+    lsSet('mh_pending', JSON.stringify({ order_id: order.order_id, cart: state.cart, ts: Date.now() })); // lets the customer re-upload after a rejection
+    if (receipt.url) URL.revokeObjectURL(receipt.url);
+    receipt.file = null; receipt.url = '';
+    finish(false, order, '', true);
+  } catch { set({ busy: false, err: t('netError') }); } finally { clearTimeout(to); }
 }
 
 /* ---------- First-time registration ---------- */
@@ -590,6 +676,7 @@ const actions = {
   pay: payNow,
   copy: (d) => copy(d.v),
   openpay: () => { const u = state.done && state.done.url; if (u) openLink(u); },
+  pickshot: () => $('#shot')?.click(),
   cancelwait: () => { pollId++; set({ wait: null }); },
   close: () => set({ sheet: null }),
 };
@@ -605,6 +692,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target.id === 'reg-name' || ev.target.id === 'reg-phone') regSave();
 });
 document.addEventListener('change', (ev) => {
+  if (ev.target.id === 'shot') handleFile(ev.target.files && ev.target.files[0]);
   if (ev.target.name === 'pickup') set({ pickup: Number(ev.target.value) });
 });
 document.addEventListener('input', (ev) => {
@@ -617,6 +705,12 @@ document.addEventListener('input', (ev) => {
 });
 
 tg?.ready(); tg?.expand();
+{ // opened from the "Upload receipt again" button after a rejected payment: bring the old order back
+  const sp = tg?.initDataUnsafe?.start_param || '';
+  if (/^resubmit/.test(sp)) {
+    try { const p = JSON.parse(lsGet('mh_pending') || 'null'); if (p && p.cart && Date.now() - p.ts < 7 * 86400000) { state.cart = p.cart; state.orderId = p.order_id; state.screen = 'pay'; } } catch {}
+  }
+}
 if (!regName || !regPhone) state.reg = { nm: state.name, ph: state.phone, edit: false }; // first launch: ask who they are
 else { const pend = lsGet(REG_PENDING); if (pend && CONFIG.USER_REGISTER_WEBHOOK) { try { sendRegistration(JSON.parse(pend)); } catch {} } }
 tg?.BackButton.onClick(back);

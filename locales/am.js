@@ -49,4 +49,10 @@ export default {
   regPrivacy: 'ለትዕዛዝዎ ሂደት ብቻ ይጠቀማል።', regThanks: 'እናመሰግናለን፣ {n}!', editDetails: 'መረጃዬን አስተካክል',
   payOnline: 'አሁን ክፈል', checkoutHint: 'በደህንነቱ የተጠበቀ የቻፓ ገጽ በቴሌብር፣ በሲቢኢ እና በሌሎችም ይከፍላሉ።',
   payTitle: 'ክፍያዎን ያጠናቅቁ', payPending: 'የቻፓ የክፍያ ገጽ ተከፍቷል። ክፍያ ከፈጸሙ በኋላ መመሪያዎ በራስ-ሰር ወደዚህ ቻት ይላካል።', openPayment: 'የክፍያ ገጹን ክፈት',
+  step1: 'የእርስዎ መረጃ', step2: 'የመክፈያ ዘዴ', step3: 'የክፍያ ደረሰኝ ይስቀሉ',
+  amountToPay: 'የሚከፈል መጠን', sendTo: 'ወደዚህ ይላኩ', openTelebirr: 'ቴሌብር ክፈት',
+  chooseFile: 'የደረሰኝ ፎቶ ይምረጡ', changeFile: 'ሌላ ምረጥ', receiptHint: 'የማጣቀሻ ቁጥሩና መጠኑ በግልጽ የሚታይበት ፎቶ ይስቀሉ።',
+  needReceipt: 'እባክዎ የክፍያ ደረሰኝ ፎቶ ይስቀሉ።', badFile: 'እባክዎ ከ{mb} ሜባ በታች የሆነ ምስል (JPG ወይም PNG) ይምረጡ።',
+  submitPayment: 'ክፍያ አስገባ', uploading: 'በመጫን ላይ…',
+  receiptSent: 'ደረሰኝዎ ደርሶናል', receiptSentText: 'ክፍያዎን እያረጋገጥን ነው። ሲጸድቅ መመሪያዎ ወደዚህ ቻት ይላካል።',
 };

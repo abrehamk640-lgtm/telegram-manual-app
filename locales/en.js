@@ -49,4 +49,10 @@ export default {
   regPrivacy: 'Used only to process your orders.', regThanks: 'Thanks, {n}!', editDetails: 'Edit my details',
   payOnline: 'Pay Now', checkoutHint: 'You will pay on a secure Chapa page with Telebirr, CBE and more.',
   payTitle: 'Complete your payment', payPending: 'We opened the Chapa payment page. After you pay, your manual is sent to this chat automatically.', openPayment: 'Open payment page',
+  step1: 'Your details', step2: 'Payment method', step3: 'Upload your payment receipt',
+  amountToPay: 'Amount to pay', sendTo: 'Send to', openTelebirr: 'Open Telebirr',
+  chooseFile: 'Choose receipt screenshot', changeFile: 'Choose another', receiptHint: 'Upload a clear screenshot where the reference number and amount are visible.',
+  needReceipt: 'Please upload your payment screenshot.', badFile: 'Please choose an image (JPG or PNG) under {mb} MB.',
+  submitPayment: 'Submit Payment', uploading: 'Uploading…',
+  receiptSent: 'Receipt received', receiptSentText: 'We are verifying your payment. Your manual will be sent to this chat as soon as it is approved.',
 };

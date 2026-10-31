@@ -5,6 +5,9 @@ export const CONFIG = {
   //   manual_order     -> bank-transfer order (reply: { "status": "awaiting_verification" })
   // In the n8n Webhook node > Options > "Allowed Origins (CORS)" set * (or your site URL).
   WEBHOOK_URL: 'https://gandalfk.app.n8n.cloud/webhook/manual-checkout',
+  // n8n Webhook that receives the payment screenshot (POST multipart/form-data). Used by the Telebirr / Bank Transfer payment steps.
+  RECEIPT_WEBHOOK: 'https://gandalfk.app.n8n.cloud/webhook/manual-receipt',
+  MAX_UPLOAD_MB: 8,            // biggest screenshot accepted (it is shrunk automatically first)
   // n8n Webhook "Production URL" that receives each NEW user's registration (POST, JSON):
   //   { name, phone, telegram_id, register_date, init_data }   Leave '' to skip sending (details are still saved on the phone).
   // In that n8n Webhook node > Options > "Allowed Origins (CORS)" set * (or your site URL).
@@ -40,10 +43,16 @@ export const ADMIN_IDS = [928441512];
 // mode 'direct' = Telebirr prompt to the customer's phone (needs the n8n workflow).
 // mode 'manual' = customer transfers money to `account`, you confirm it yourself.
 export const PAYMENTS = [
-  // mode 'checkout' = opens the Chapa payment page (Telebirr, CBE, cards...). The backend sends the manual to the customer's Telegram after payment.
-  { id: 'chapa', mode: 'checkout', label: { en: 'Pay online', am: 'በኦንላይን ክፈል' } },
+  // mode 'receipt' = the customer pays by Telebirr / bank, then uploads the payment screenshot in the app.
   {
-    id: 'bank', mode: 'manual', label: { en: 'Bank', am: 'ባንክ' },
+    id: 'telebirr', mode: 'receipt', label: { en: 'Telebirr', am: 'ቴሌብር' },
+    account: { number: '09XXXXXXXX', holder: 'Account holder name' },
+    // Button that opens Telebirr. tel:*127%23 opens the phone dialer with the Telebirr USSD code *127#.
+    // Replace with your own link if you have one, or '' to hide the button.
+    deepLink: 'tel:*127%23',
+  },
+  {
+    id: 'bank', mode: 'receipt', label: { en: 'Bank Transfer', am: 'የባንክ ዝውውር' },
     account: { name: 'Commercial Bank of Ethiopia (CBE)', number: '1000XXXXXXXXX', holder: 'Account holder name' },
   },
 ];
