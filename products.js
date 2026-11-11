@@ -196,7 +196,7 @@ export const PRODUCTS = [
   },
 
   // ↓↓↓ PASTE NEW MANUALS ABOVE THIS LINE ↓↓↓
-];  // ---- Paste this inside the PRODUCTS array in data/products.js, above the line "PASTE NEW MANUALS ABOVE THIS LINE" ----
+];  
   {
     id: 'a3', cat: 'apps', code: '300003', price: 250,
     name: { en: 'Digital Marketing & Business Automation Guide', am: 'ዲጂታል ማርኬቲንግ እና የንግድ አውቶሜሽን መመሪያ' },
