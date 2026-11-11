@@ -196,7 +196,62 @@ export const PRODUCTS = [
   },
 
   // ↓↓↓ PASTE NEW MANUALS ABOVE THIS LINE ↓↓↓
-];
+];  // ---- Paste this inside the PRODUCTS array in data/products.js, above the line "PASTE NEW MANUALS ABOVE THIS LINE" ----
+  {
+    id: 'a3', cat: 'apps', code: '300003', price: 250,
+    name: { en: 'Digital Marketing & Business Automation Guide', am: 'ዲጂታል ማርኬቲንግ እና የንግድ አውቶሜሽን መመሪያ' },
+    image: '', emoji: '📈',   // when you have a cover picture: image: 'img/digital-marketing-guide.jpg'
+    summary: {
+      en: `- Find customers online with Telegram and social media
+- Take orders and payments simply
+- Automate repeated tasks with Google Sheets and n8n
+- Includes a 7-day action plan and a setup checklist`,
+      am: `- በቴሌግራምና በማኅበራዊ ሚዲያ ደንበኞችን ማግኘት
+- ትዕዛዝና ክፍያ በቀላሉ መቀበል
+- በጉግል ሺትና n8n የሚደጋገሙ ሥራዎችን በራስ-ሰር ማድረግ
+- የ7 ቀን የድርጊት ዕቅድና የዝግጅት ዝርዝር ተካቷል`,
+    },
+    fullText: {
+      en: `# About this guide
+A step-by-step guide for small businesses: find customers online, take orders and payments simply, and automate repeated work. No programming knowledge is needed.
+
+# Chapters
+1. Know your customer and your offer
+2. Build your online presence
+3. Create content that sells
+4. Take orders and payments simply
+5. Automate the routine work
+6. Measure and improve
+
+# Who it is for
+Small business owners, shop managers, freelancers and students starting an online business.
+
+# Get the full guide
+The complete PDF with the 7-day action plan and setup checklist is sent to you on Telegram after your order is confirmed.`,
+      am: `# ስለዚህ መመሪያ
+ለአነስተኛ ንግዶች ደረጃ በደረጃ የሚያሳይ መመሪያ፦ ደንበኞችን በኢንተርኔት ማግኘት፣ ትዕዛዝና ክፍያ በቀላሉ መቀበል እና የሚደጋገሙ ሥራዎችን በራስ-ሰር ማድረግ። የፕሮግራም እውቀት አያስፈልግም።
+
+# ምዕራፎች
+1. ደንበኛዎንና ቅናሽዎን ይወቁ
+2. የመስመር ላይ መገኘትዎን ይገንቡ
+3. የሚሸጥ ይዘት ይፍጠሩ
+4. ትዕዛዝና ክፍያ በቀላሉ ይቀበሉ
+5. የሚደጋገሙ ሥራዎችን በራስ-ሰር ያሰሩ
+6. ይለኩ፣ ያሻሽሉ
+
+# ለማን ነው
+የአነስተኛ ንግድ ባለቤቶች፣ የሱቅ ኃላፊዎች፣ ፍሪላንሰሮች እና የመስመር ላይ ንግድ የሚጀምሩ ተማሪዎች።
+
+# ሙሉውን መመሪያ ያግኙ
+የ7 ቀን የድርጊት ዕቅድና የዝግጅት ዝርዝር ያለው ሙሉው PDF ትዕዛዝዎ ከተረጋገጠ በኋላ በቴሌግራም ይላክልዎታል።`,
+    },
+    voiceNoteUrl: '',
+    manualPdfUrl: {
+      en: 'https://raw.githubusercontent.com/abrehamk640-lgtm/telegram-manual-app/main/manuals/digital-marketing-automation-guide-en.pdf',
+      am: 'https://raw.githubusercontent.com/abrehamk640-lgtm/telegram-manual-app/main/manuals/digital-marketing-automation-guide-am.pdf',
+    },
+  },
+
 
 /* ===================== TEMPLATE - copy, paste above, then edit =====================
   {
